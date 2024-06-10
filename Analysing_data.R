@@ -152,7 +152,8 @@ sample <- sample_data(meta_data_clean)
 ####################################
 
 #filtering out a couple of random sites
-meta_data_cut <- meta_data %>% filter( grepl('Esk|Poukawa', HBRC_Site_Name))
+meta_data_cut <- meta_data %>% filter( grepl('Esk Rvr at Berry Rd', HBRC_Site_Name))
+#othero one is Esk Rvr at Waipunga Br
 out_table_MZ_cut <- out_table_MZ %>% filter(UID %in% meta_data_cut$UID)
 #reverse in case there is one missing the other way for this marker
 meta_data_cut_clean <- meta_data_cut %>% filter(UID %in% out_table_MZ$UID)
@@ -191,6 +192,18 @@ sample <- sample_data(meta_data_cut_clean)
 
 #some of this wont work on all sites and some wont work on cutdown just fucking about
 FisheDNA<-phyloseq(otu, taxa, sample)
+
+#order samples by date
+#modify for which metadata using:
+meta_data_clean
+test<-meta_data_cut_clean[order(as.Date(meta_data_cut_clean$CollectionDate, format="%d/%m/%Y")),]
+test<-meta_data_clean[order(as.Date(meta_data_clean$CollectionDate, format="%d/%m/%Y")),]
+test_names<-row.names(test)
+library(microViz)
+?ps_reorder
+FisheDNA<-ps_reorder(FisheDNA, test_names)
+#looks reordered now
+
 FisheDNA
 sample_names(FisheDNA)[1:5]
 rank_names(FisheDNA)
@@ -203,16 +216,54 @@ FisheDNA.5 #drop from 321 to 250 taxa
 
 FisheDNA.5.fish = subset_taxa(FisheDNA.5, Class=="Actinopteri" |Class=="Cladistia" |Class=='Hyperoartia')
 #7 fish taxa
-FisheDNA.5 <-FisheDNA.5.fish
+#FisheDNA.5 <-FisheDNA.5.fish
 
 Fish.eDNA.pa <- microbiome::transform(FisheDNA.5, 'pa') #pa dataset
+library(RColorBrewer)
+mycolors = c(brewer.pal(name="Dark2", n = 8), brewer.pal(name="Paired", n = 6))
+?plot_bar
+p = plot_bar(FisheDNA.5,  fill="Class")
+p + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
+  ggtitle("Read abundance across sample number ") +
+  geom_vline(aes(xintercept = 646.5), 
+             linetype = "dashed", colour = "red",size = 1)+
+  theme(legend.key.size = unit(0.05, 'cm'))+
+ theme(legend.position="none")#+
+  scale_fill_manual(values = mycolors) + scale_color_manual(values = mycolors)
+
+#presence absence plot
+  
+  p = plot_bar(Fish.eDNA.pa,  fill="Class")
+  p + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
+    ggtitle("Presence/Absence across sites") +
+    geom_vline(aes(xintercept = 646.5), 
+               linetype = "dashed", colour = "red",size = 1)+
+    theme(legend.key.size = unit(0.05, 'cm'))#+
+    theme(legend.position="none")
+
+#adding a vertical line to indicate cyclone date 
+  #makes a more aesthetic plot
+#such a clunky way to do colours, not sure why I cant set it in main 
+#colours will only work for subset of freshwater (14 classes)
+
+Fish.eDNA.pa <- microbiome::transform(FisheDNA.5, 'pa') #pa dataset
+?plot_bar
 p = plot_bar(FisheDNA.5,  fill="Class")
 p + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
   ggtitle("Read abundance across sample number ")  #makes a more aesthetic plot
 
-p1 = plot_bar(FisheDNA.5, "HBRC_Site_Name", fill="Class")
+p1 = plot_bar(FisheDNA.5, "location_date", fill="Class")
+#do presence/absence plot
+#p1 = plot_bar(Fish.eDNA.pa, "location_date", fill="Class")
+
+unique(p1$data$location_date)
+#relevel to order chart
+p1$data$location_date <- factor(p$data$location_date, levels = c('Esk Rvr at Berry Rd_24/02/22',"Esk Rvr at Berry Rd_20/04/23","Esk Rvr at Berry Rd_30/08/23","Esk Rvr at Berry Rd_16/11/23","Esk Rvr at Berry Rd_24/01/24"))
 p1 + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
-  ggtitle("Read abundance across HBRC_Sites") 
+  ggtitle("Presence/absence across HBRC_Sites") +
+#  ggtitle("Read abundance across HBRC_Sites")+
+  theme(legend.key.size = unit(0.03, 'cm'))+theme(axis.text=element_text(size=4),axis.title=element_text(size=10,face="bold"))
+
 #
 p1 = plot_bar(FisheDNA.5, "Cyclone", fill="Species")
 p1 + geom_bar(aes(color=Species, fill=Species), stat="identity", position="stack") +
@@ -222,10 +273,18 @@ p1 + geom_bar(aes(color=Species, fill=Species), stat="identity", position="stack
 #First step is to transform to relative abundance
 FisheDNA.6 = transform_sample_counts(Fish.eDNA.pa, function(x) x / sum(x) )
 FisheDNA.6 
+#or from raw data: probably more sensible but shit looking
+FisheDNA.6 = transform_sample_counts(FisheDNA.5, function(x) x / sum(x) )
+FisheDNA.6 
 
 data_fish <- psmelt(FisheDNA.6)
-relabundance_plot <- ggplot(data=data_fish, aes(x=Sample, y=Abundance, fill=Class)) + facet_grid(~HBRC_Site_Name, scales = "free")
-relabundance_plot + geom_bar(aes(), stat="identity", position="fill") 
+#data_fish$CollectionDate <- factor(data_fish$CollectionDate, levels = c('24/02/22',"20/04/23","30/08/23","16/11/23","24/01/24"))
+data_fish<-data_fish[order(as.Date(data_fish$CollectionDate, format="%d/%m/%Y")),]
+relabundance_plot <- ggplot(data=data_fish, aes(x=Sample, y=Abundance, fill=Phylum)) + facet_grid(~Year, scales = "free")
+relabundance_plot + geom_bar(aes(), stat="identity", position="fill") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  #theme(legend.position="none")
+#+
+  theme(legend.key.size = unit(0.03, 'cm'))
 
 #Lets get these objects out of phyloseq and use them for further analysis
 
@@ -268,32 +327,35 @@ rich<-cbind(rich, Fish_Sample)
 
 
 ## test assumptions of statistical test, first normal distribution, next homoscedasticity
-histogram(~ Observed | location_cyclone, data = rich, layout = c(2,2))
+histogram(~ Observed | location_date, data = rich, layout = c(2,2))
 
 shapiro.test(rich$Observed)
 
-bartlett.test(Observed ~location_cyclone , data = rich)
+bartlett.test(Observed ~location_date , data = rich)
 #non-parametric - need to use Kruskal-Wallis test
-kruskal.test(Observed ~ location_cyclone, data = rich)
-boxplot(Observed ~ location_cyclone, data = rich, ylab = 'Species Richness', xlab = 'Location')
+kruskal.test(Observed ~ location_date, data = rich)
+boxplot(Observed ~ location_date, data = rich, ylab = 'Species Richness', xlab = 'Location')
 
+rich$location_date
 
-ggplot(rich, aes(x=location_cyclone, y=Observed, colour = location_cyclone)) +
+rich$location_date <- factor(rich$location_date, levels = c('Esk Rvr at Berry Rd_24/02/22',"Esk Rvr at Berry Rd_20/04/23","Esk Rvr at Berry Rd_30/08/23","Esk Rvr at Berry Rd_16/11/23","Esk Rvr at Berry Rd_24/01/24"))
+
+ggplot(rich, aes(x=location_date, y=Observed, colour = location_date)) +
   geom_boxplot() +
   ylab("Observed zotu richness")+
   theme_bw() +
-  theme(axis.text.x = element_text(angle = 45, hjust=1))
+  theme(axis.text.x = element_text(angle = 90, hjust=1))+theme(axis.text=element_text(size=4),axis.title=element_text(size=10,face="bold"))
 
 #pairwise test - lets look at the difference in richness
-pairwise.wilcox.test(rich$Observed, rich$location_cyclone,
+pairwise.wilcox.test(rich$Observed, rich$location_date,
                      p.adjust.method = "BH")
 
 #iNEXT
 library(iNEXT.3D)
-categories <- unique(sample_data(Fish.eDNA.pa)$location_cyclone)
+categories <- unique(sample_data(Fish.eDNA.pa)$location_date)
 split_physeq_list <- list()
 for (category in categories) {
-  sub_physeq.100 <- subset_samples(Fish.eDNA.pa, location_cyclone == category)
+  sub_physeq.100 <- subset_samples(Fish.eDNA.pa, location_date == category)
   split_physeq_list[[category]] <- otu_table(sub_physeq.100)
 }  
 matrix_list <- lapply(split_physeq_list, function(x) {
@@ -308,10 +370,16 @@ for (category in categories) {
 }
 
 out.raw <- iNEXT3D(data = matrix_list$data, diversity = 'TD', q = c(0, 1, 2), datatype = 'incidence_raw', nboot = 50)
+
 ggiNEXT3D(out.raw, type = 1, facet.var = 'Assemblage') + facet_wrap(~Assemblage, nrow = 3)
 ggiNEXT3D(out.raw, type = 1, facet.var = "Order.q")
 ggiNEXT3D(out.raw, type = 2, facet.var = "Order.q", color.var = "Assemblage")
 
+ggiNEXT3D(out.raw, type = 2, facet.var = "Order.q", color.var = "Assemblage") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+
+  theme(legend.key.size = unit(0.03, 'cm'))+theme(axis.text=element_text(size=4),axis.title=element_text(size=4,face="bold"),text=element_text(size=6))+  theme(legend.key.size = unit(0.05, 'cm'))
+
+
+?ggiNEXT3D
 #NMDS Plot
 
 
@@ -334,8 +402,15 @@ stressplot(ord) # Produces a Shepards diagram
 both.scores = cbind(scores(ord), Fish_Sample_df) 
 
 ggplot(both.scores) +
-  geom_point( aes(x=NMDS1,y=NMDS2, colour = location_cyclone),size=2) +
-  stat_ellipse(aes(x=NMDS1, y=NMDS2, colour= location_cyclone))+ 
+  geom_point( aes(x=NMDS1,y=NMDS2, colour = location_date),size=2) +
+  stat_ellipse(aes(x=NMDS1, y=NMDS2, colour= location_date))+ 
+  coord_equal() +
+  ggtitle("NMDS") +
+  theme_classic() 
+
+ggplot(both.scores) +
+  geom_point( aes(x=NMDS1,y=NMDS2, colour = location_date),size=2) +
+  stat_ellipse(aes(x=NMDS1, y=NMDS2, colour= location_date))+ 
   coord_equal() +
   ggtitle("NMDS") +
   theme_classic() 
@@ -452,7 +527,7 @@ otu_table_freshwater <- records_eukaryote_freshwater %>% select(UID, PrimerSet, 
 #split by primer set
 otu_table_freshwater_splitout <- split(otu_table_freshwater, otu_table_freshwater$PrimerSet)
 
-otu_table_freshwater_splitout_CI<- otu_table_splitout$CI %>% select(-PrimerSet) %>% group_by(UID, TaxID)
+otu_table_freshwater_splitout_CI<- otu_table_freshwater_splitout$CI %>% select(-PrimerSet) %>% group_by(UID, TaxID)
 
 #BE - 1710 - 18S general eukaryote
 #BU - 1723 - 18S general eukaryote
@@ -488,6 +563,7 @@ meta_data_clean <- meta_data %>% filter(UID %in% otu_table_freshwater_splitout_C
 #long format OTU table
 #rows samples, columns tax, values counts
 library(reshape2)
+unique(otu_table_freshwater_splitout_CI$TaxID)
 otu_table_freshwater_splitout_CI_wide<-dcast(otu_table_freshwater_splitout_CI, TaxID~UID,value.var = "Count", fun.aggregate = sum)
 
 #so 1337 unique taxid's
@@ -496,7 +572,10 @@ otu_table_freshwater_splitout_CI_wide<-dcast(otu_table_freshwater_splitout_CI, T
 #generate taxa table from TaxIDs
 #from records file
 taxa_table_eukaryote_freshwater<-records_eukaryote_freshwater %>% select(TaxID,Phylum,Class,Order,Family,Genus,Species) %>% distinct()
-
+#so this has 499 unique taxids but otu_table_freshwater_splitout_CI_wide has 1337
+test<-row.names(otu_table_freshwater_splitout_CI_wide)
+test
+records_eukaryote_freshwater %>% filter(TaxID %in% test) %>% select(TaxID) %>% distinct() %>% nrow()
 
 length(unique(otu_table_freshwater_splitout_CI$TaxID))
 #1337 but one is a NA
@@ -538,6 +617,7 @@ taxa_table_eukaryote_freshwater_clean$root<-'Root'
 taxa_table_eukaryote_freshwater_clean <- taxa_table_eukaryote_freshwater_clean %>%
   select(root, everything())
 
+nrow(taxa_table_eukaryote_freshwater_clean)
 tax_mat<-as.matrix(taxa_table_eukaryote_freshwater_clean)
 otu <- otu_table(otu_table_freshwater_splitout_CI_wide, taxa_are_rows = TRUE) 
 taxa <- tax_table(tax_mat)
@@ -575,4 +655,69 @@ leaflet(meta_data_map) %>%
                    stroke = FALSE, fillOpacity = 1) %>% 
   addLegend("bottomright", pal = pal, values = ~n_uniq_samplingdates,
             title = "# unique sampling dates",
+            opacity = 1) 
+
+
+#toanga species map#
+#just from everything?
+#just plot out presence before and after
+head(records_eukaryote_freshwater)
+
+#short finned eel
+#Anguilla australis
+#long finned eel
+#Anguilla dieffenbachii
+#freshwater cray genus: 
+#Paranephrops 
+test<-left_join(records_eukaryote_freshwater,meta_data,by='UID')
+
+#year2022<-test %>% filter(Species=='Anguilla dieffenbachii' & Year==2022 ) %>% select(HBRC_Site_Name) %>% distinct()
+#year2022<-test %>% filter(Genus=='Nesameletus' & Year==2022 ) %>% select(HBRC_Site_Name) %>% distinct()
+year2022<-test %>% filter(Family=='Nesameletidae' & Year==2022 ) %>% select(HBRC_Site_Name) %>% distinct()
+
+#year2023<-test %>% filter(Species=='Anguilla dieffenbachii' & Year==2023 ) %>% select(HBRC_Site_Name) %>% distinct()
+#year2023<-test %>% filter(Genus=='Nesameletus' & Year==2023 ) %>% select(HBRC_Site_Name) %>% distinct()
+year2023<-test %>% filter(Family=='Nesameletidae' & Year==2023 ) %>% select(HBRC_Site_Name) %>% distinct()
+
+#year2024<-test %>% filter(Species=='Anguilla dieffenbachii' & Year==2024 ) %>% select(HBRC_Site_Name) %>% distinct()
+#year2024<-test %>% filter(Genus=='Nesameletus' & Year==2024 ) %>% select(HBRC_Site_Name) %>% distinct()
+year2024<-test %>% filter(Family=='Nesameletidae' & Year==2024 ) %>% select(HBRC_Site_Name) %>% distinct()
+#sites sampled each year
+
+year2022_allsites<-test %>% filter(Year==2022 ) %>% select(HBRC_Site_Name) %>% distinct()
+year2023_allsites<-test %>% filter( Year==2023 ) %>% select(HBRC_Site_Name) %>% distinct()
+year2024_allsites<-test %>% filter(Year==2024 ) %>% select(HBRC_Site_Name) %>% distinct()
+
+year2022_allsites<-year2022_allsites %>% mutate(present = case_when(HBRC_Site_Name %in% year2022$HBRC_Site_Name~"present",TRUE ~ 'Absent'))
+
+year2023_allsites<-year2023_allsites %>% mutate(present = case_when(HBRC_Site_Name %in% year2023$HBRC_Site_Name~"present",TRUE ~ 'Absent'))
+
+year2024_allsites<-year2024_allsites %>% mutate(present = case_when(HBRC_Site_Name %in% year2024$HBRC_Site_Name~"present",TRUE ~ 'Absent'))
+
+year2023_allsites<-year2023_allsites %>% mutate(present_2022 = case_when(HBRC_Site_Name %in% year2022$HBRC_Site_Name~"present",TRUE ~ 'Absent'))
+
+year2023_allsites<-year2023_allsites %>% mutate(present_overtime = case_when(
+  (present == 'Absent' & present_2022 == 'Absent') ~ 'Absent',
+  (present == 'present' & present_2022 == 'present') ~ 'Present_2022&2023',
+  (present == 'present' & present_2022 == 'Absent') ~ 'Gain 2023',
+  (present == 'Absent' & present_2022 == 'present') ~ 'Loss 2023', TRUE ~ NA_character_
+))
+
+meta_data_map<-read.table('Wilderlab_meta_map.txt',sep='\t',quote='',header =T)
+
+year2023_allsites<-left_join(year2023_allsites,meta_data_map,by='HBRC_Site_Name')
+
+pal <- colorFactor(
+  palette = 'Dark2',
+  domain = year2023_allsites$present_overtime
+)
+
+leaflet(year2023_allsites) %>% 
+  addTiles() %>%
+  addCircleMarkers(~Longitude_hbrc, ~Latitude_hbrc,
+                   popup = ~paste(HBRC_Site_Name),
+                   color = ~ pal(present_overtime),
+                   stroke = FALSE, fillOpacity = 1) %>% 
+  addLegend("bottomright", pal = pal, values = ~present_overtime,
+            title = "Presence/absence",
             opacity = 1) 

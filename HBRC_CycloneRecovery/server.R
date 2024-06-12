@@ -12,17 +12,28 @@ library(shiny)
 # Define server logic required to draw a histogram
 function(input, output, session) {
 
-    output$distPlot <- renderPlot({
+  output$mymap <- renderLeaflet({
+    leaflet(meta_data_map) %>%
+      addTiles() %>%
+      addCircleMarkers(~Longitude_hbrc, ~Latitude_hbrc,
+                       popup = ~paste(HBRC_Site_Name),
+                       color = ~ pal(n_uniq_samplingdates),
+                       stroke = FALSE, fillOpacity = 1) %>% 
+      addLegend("bottomright", pal = pal, values = ~n_uniq_samplingdates,
+                title = "# unique sampling dates",
+                opacity = 1) 
+   })
+  
+  
+   # output$distPlot <- renderPlot({
 
         # generate bins based on input$bins from ui.R
-        x    <- faithful[, 2]
-        bins <- seq(min(x), max(x), length.out = input$bins + 1)
+    #    x    <- faithful[, 2]
+     #   bins <- seq(min(x), max(x), length.out = input$bins + 1)
 
         # draw the histogram with the specified number of bins
-        hist(x, breaks = bins, col = 'darkgray', border = 'white',
-             xlab = 'Waiting time to next eruption (in mins)',
-             main = 'Histogram of waiting times')
+   #     hist(x, breaks = bins, col = 'darkgray', border = 'white',
+    #         xlab = 'Waiting time to next eruption (in mins)',
+    #         main = 'Histogram of waiting times')
 
-    })
-
-}
+    }

@@ -45,12 +45,11 @@ library('microbiome')
 # Define server logic required to draw a histogram
 function(input, output, session) {
   
- # output$secondSelection<-renderUI({selectInput("taxa", "Select taxa", choices =sort((test %>% select(input$level)  %>% unique()) [,1]))})
+ output$secondSelection<-renderUI({selectInput("taxa", "Select taxa", choices =sort((test %>% select(input$level)  %>% unique()) [,1]))})
   
   #probably should be more like summer 2021, summer 2022 or something
   test_filtered<- reactive({
-#    test_filtered_select<-test %>% filter(.data[[input$level]] == input$secondSelection)
-    test_filtered_select<-test %>% filter(Family == input$taxa)
+    test_filtered_select<-test %>% filter(eval(parse(text = paste0(input$level))) == input$taxa)
     if (input$integer == 2021) {
       year2021_filtered<-test_filtered_select %>% filter(Year==2021 ) %>% select(HBRC_Site_Name) %>% distinct()
       year2021_all_sites<-test %>% filter(Year==2021 ) %>% select(HBRC_Site_Name) %>% distinct()

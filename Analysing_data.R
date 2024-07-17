@@ -19,20 +19,24 @@ samples<-read.csv('HBRC_samples_Eddy.csv')
 records<-read.csv('HBRC_records_Eddy.csv')
 head(records)
 otu_table <- records %>% select(UID, PrimerSet, Count, TaxID)
+test<-otu_table %>% filter(PrimerSet=='CI')
+test2<-otu_table %>% filter(PrimerSet=='CI')%>% select(-PrimerSet) %>% group_by(UID, TaxID)
+
 
 #split by primer set
 otu_table_splitout <- split(otu_table, otu_table$PrimerSet)
 #so there is 20 different primer sets
 #no idea what each of them is
-otu_table_splitout
+#otu_table_splitout$
 
-
+#otu_table_splitout %>% (filter %in%'CI')
 #just work through one primer set for now and then come back 
 
 #just choosing a random not super diverse but present in most samples to play with
 head(otu_table_splitout$MZ)
 
 out_table_MZ<- otu_table_splitout$MZ %>% select(-PrimerSet) %>% group_by(UID, TaxID)
+out_table_MZ<- otu_table_splitout$CI %>% select(-PrimerSet) %>% group_by(UID, TaxID)
 
 #switching to CI which is insect
 out_table_MZ<- otu_table_splitout$CI %>% select(-PrimerSet) %>% group_by(UID, TaxID)

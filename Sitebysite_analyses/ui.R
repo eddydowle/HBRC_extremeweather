@@ -8,31 +8,43 @@
 #
 
 library(shiny)
-
+library(shinyWidgets)
 # Define UI for application that draws a histogram
 fluidPage(
 
     # Application title
-    titlePanel("Old Faithful Geyser Data"),
+    titlePanel("eDNA by site"),
 
     # Sidebar with a slider input for number of bins
     sidebarLayout(
         sidebarPanel(
-            sliderInput("bins",
-                        "Number of bins:",
-                        min = 1,
-                        max = 50,
-                        value = 30)
-      ,      
-        selectInput("assay", "Select Assay",
-                            choices =c("CI","BE","BU","MZ","RV","TP","UM","WV"), selected='CI')),
+          selectInput("analysis","Select Analysis",choices =c('All locations','By location'), selected = 'All locations'),
+         selectInput("assay", "Select Assay",
+                            choices =c("CI","BE","BU","MZ","RV","TP","UM","WV"), selected='CI'),
+         conditionalPanel("input.analysis=='By location'",
+                          pickerInput('site_choice',"Select site", unique(meta_data$HBRC_Site_Name),multiple=F)),
+        conditionalPanel(
+          "input.assay=='CI'",
+          pickerInput("subset_data_CI", "Select otu's", c("All","Just freshwater"),multiple = F))
+        ,
+        conditionalPanel(
+          "input.assay=='RV'",
+          pickerInput("subset_data_RV", "Select otu's", c("All","Just freshwater"),multiple = F))
+        ,
+        conditionalPanel(
+          "input.assay=='WV'",
+          pickerInput("subset_data_WV", "Select otu's", c("All","Just freshwater"),multiple = F))
+        ),
         
+        mainPanel("main panel",
+                  column(6,plotOutput(outputId="plot1", width="500px",height="400px"))
+        )
 
         # Show a plot of the generated distribution
-        mainPanel(
+     #   mainPanel(
           #  plotOutput("distPlot")
-          plotOutput("plot1")
+      #    plotOutput("plot1")
           #tableOutput("table1")
-        )
+    #    )
     )
 )

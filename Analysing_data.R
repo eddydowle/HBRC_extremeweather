@@ -196,7 +196,9 @@ sample <- sample_data(meta_data_cut_clean)
 
 #some of this wont work on all sites and some wont work on cutdown just fucking about
 FisheDNA<-phyloseq(otu, taxa, sample)
-
+sample_data(FisheDNA)
+test<-meta_data_clean %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name=='Esk Rvr at Berry Rd') %>% pull(sample_id)
+testphyloseq<-prune_samples(test,FisheDNA)
 #order samples by date
 #modify for which metadata using:
 meta_data_clean
@@ -262,7 +264,9 @@ p1 = plot_bar(FisheDNA.5, "location_date", fill="Class")
 
 unique(p1$data$location_date)
 #relevel to order chart
-p1$data$location_date <- factor(p$data$location_date, levels = c('Esk Rvr at Berry Rd_24/02/22',"Esk Rvr at Berry Rd_20/04/23","Esk Rvr at Berry Rd_30/08/23","Esk Rvr at Berry Rd_16/11/23","Esk Rvr at Berry Rd_24/01/24"))
+#p1$data$location_date <- factor(p$data$location_date, levels = c('Esk Rvr at Berry Rd_24/02/22',"Esk Rvr at Berry Rd_20/04/23","Esk Rvr at Berry Rd_30/08/23","Esk Rvr at Berry Rd_16/11/23","Esk Rvr at Berry Rd_24/01/24"))
+
+p1$data$location_date <- factor(p1$data$location_date, levels = c('Esk Rvr at Berry Rd_24/02/22',"Esk Rvr at Berry Rd_20/04/23","Esk Rvr at Berry Rd_30/08/23","Esk Rvr at Berry Rd_16/11/23","Esk Rvr at Berry Rd_24/01/24"))
 p1 + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
   ggtitle("Presence/absence across HBRC_Sites") +
 #  ggtitle("Read abundance across HBRC_Sites")+
@@ -289,6 +293,37 @@ relabundance_plot + geom_bar(aes(), stat="identity", position="fill") + theme(ax
   #theme(legend.position="none")
 #+
   theme(legend.key.size = unit(0.03, 'cm'))
+
+pbar = plot_bar(FisheDNA.5, "CollectionDate", fill="Class")
+#do presence/absence plot
+pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"))
+
+pbar + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
+  ggtitle("Presence/absence") +
+  #  ggtitle("Read abundance across HBRC_Sites")+
+  theme(legend.key.size = unit(0.03, 'cm'))+theme(axis.text=element_text(size=4),axis.title=element_text(size=10,face="bold"))
+pbar
+
+#desired_order <- names(sort(meta_data_cut_clean$CollectionDate, decreasing=TRUE))
+
+
+p1 = plot_bar(FisheDNA.5, "location_date", fill="Class")
+unique(p1$data$location_date)
+p1$data$location_date <- factor(p1$data$location_date, levels = c('Esk Rvr at Berry Rd_24/02/22',"Esk Rvr at Berry Rd_20/04/23","Esk Rvr at Berry Rd_30/08/23","Esk Rvr at Berry Rd_16/11/23","Esk Rvr at Berry Rd_24/01/24"))
+p1 + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
+  ggtitle("Presence/absence across HBRC_Sites") +
+  #  ggtitle("Read abundance across HBRC_Sites")+
+  theme(legend.key.size = unit(0.03, 'cm'))+theme(axis.text=element_text(size=4),axis.title=element_text(size=10,face="bold"))
+
+
+
+sort(as.POSIXct(unique(pbar$data$CollectionDate)))
+format(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y"), "20%y-%m-%d")
+sort(format(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y"), "20%y-%m-%d"))
+dplyr::arrange(data, as.POSIXct(pbar$data$CollectionDate))
+pbar$data$Sample <- factor(pbar$data$Sample, levels = desired_order)
+pbar
+
 
 #Lets get these objects out of phyloseq and use them for further analysis
 
@@ -426,7 +461,8 @@ NMDSphylo = plot_ordination(Fish.eDNA.pa, FisheDNA.ord, type="samples", color="l
 NMDSphylo + stat_ellipse(aes(x=NMDS1, y=NMDS2, colour= location_cyclone))+
   geom_point(size=2) +  coord_equal() +
   ggtitle("NMDS phyloseq") +
-  theme_classic() 
+  theme_classic()  
+
 
 #PCoA
 

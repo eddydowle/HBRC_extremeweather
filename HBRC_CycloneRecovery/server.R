@@ -23,23 +23,26 @@ library('phyloseq')
 library('iNEXT.3D') 
 library('ggplot2') 
 library('microbiome')
+library('leaflet')
 
 
-#setwd("~/Dropbox (Personal)/Otago_2023 (1)/BiomeGene/extremeweatherevents/ASV_files/OneDrive_1_7-05-2024/")
-#records<-read.csv('HBRC_records_Eddy.csv')
+setwd("~/Dropbox (Personal)/Otago_2023 (1)/BiomeGene/extremeweatherevents/ASV_files/OneDrive_1_7-05-2024/")
+meta_data_map<-read.table('Wilderlab_meta_map.txt',sep='\t',quote='',header =T)
+
+records<-read.csv('HBRC_records_Eddy.csv')
 #bring in meta data
-#meta_data<-read.table('Wilderlab_meta_out.txt',sep='\t',quote='',header =T)
-#freshwater_invertsfish<-read.table('freshwater_invertsfish.txt',header=T,row.names=NULL,sep='\t')
+meta_data<-read.table('Wilderlab_meta_out.txt',sep='\t',quote='',header =T)
+freshwater_invertsfish<-read.table('freshwater_invertsfish.txt',header=T,row.names=NULL,sep='\t')
 #freshwater_invertsfish %>% distinct(Rank) 
-#family<-freshwater_invertsfish %>% filter(Rank == 'Family')
-#genus<-freshwater_invertsfish %>% filter(Rank == 'Genus')
-#phylum<-freshwater_invertsfish %>% filter(Rank == 'Phylum')
-#order<-freshwater_invertsfish %>% filter(Rank == 'Order')
-#class<-freshwater_invertsfish %>% filter(Rank == 'Class')
+family<-freshwater_invertsfish %>% filter(Rank == 'Family')
+genus<-freshwater_invertsfish %>% filter(Rank == 'Genus')
+phylum<-freshwater_invertsfish %>% filter(Rank == 'Phylum')
+order<-freshwater_invertsfish %>% filter(Rank == 'Order')
+class<-freshwater_invertsfish %>% filter(Rank == 'Class')
 
-#records_eukaryote_freshwater<-records %>% filter(Phylum %in% phylum$ID | Family %in% family$ID | Genus %in% genus$ID | Order %in% order$ID | Class %in% class$ID)
+records_eukaryote_freshwater<-records %>% filter(Phylum %in% phylum$ID | Family %in% family$ID | Genus %in% genus$ID | Order %in% order$ID | Class %in% class$ID)
 
-#test<-left_join(records_eukaryote_freshwater,meta_data,by='UID')
+test<-left_join(records_eukaryote_freshwater,meta_data,by='UID')
 
 
 function(input, output, session) {

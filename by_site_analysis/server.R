@@ -26,6 +26,7 @@ library('iNEXT.3D')
 library('ggplot2') 
 library('microbiome')
 library('gridExtra')
+library('ranacapa')
 
 #input into phyloseq
 setwd("~/Dropbox (Personal)/Otago_2023 (1)/BiomeGene/extremeweatherevents/ASV_files/OneDrive_1_7-05-2024/")
@@ -119,32 +120,44 @@ function(input, output, session) {
   })
   #then should be able to build plots from phyloseq_object
   
- # output[["table1"]] <- renderTable({taxa_names(phyloseq_object())[1:10]})
-  #otu_table(phyloseq_object())[1:5, 1:5]
-  #tax_table(phyloseq_object())[1:5, 1:4]
-  #taxa_names(phyloseq_object())[1:10]
+#generate a innext object
   
- # count_samplesprecyclone<-reactive({
-#    nrow(meta_data_clean()[meta_data_clean()$Year == "2022"|meta_data_clean()$Year == "2021"|meta_data_clean()$Year == "2020",])
- # })
+  inext_object<-reactive({
+    phyloseq.pa <- microbiome::transform(phyloseq_object(), 'pa')
+  categories <- unique(sample_data(phyloseq.pa)$CollectionDate)
+  split_physeq_list <- list()
+  print(categories)
+for (category in categories) {
+    remove_idx = as.character(get_variable(phyloseq.pa, "CollectionDate")) != category
+    sub_physeq.100 <- prune_samples(remove_idx, phyloseq.pa)
+    split_physeq_list[[category]] <- otu_table(sub_physeq.100)}
+  matrix_list <- lapply(split_physeq_list, function(x) {
+    otu_table <- as(x, "matrix")
+    return(otu_table)
+  })
+  matrix_list<-NULL
+  matrix_list <- list(data = list())
+  for (category in categories) {
+    otu_table <- as(otu_table(split_physeq_list[[category]]), "matrix")
+    matrix_list[["data"]][[category]] <- otu_table
+  }
+  out.raw <- iNEXT3D(data = matrix_list$data, diversity = 'TD', q = c(0, 1, 2), datatype = 'incidence_raw', nboot = 50)
+  return(out.raw)
+  #type 1 for site stats
+ #ggiNEXT3D(out.raw, type = 1, facet.var = 'Assemblage') + facet_wrap(~Assemblage, nrow = 3)
+#  ggiNEXT3D(out.raw, type = 1, facet.var = "Order.q")
+ #type 2 for sample completeness curve
+  # ggiNEXT3D(out.raw, type = 2, facet.var = "Order.q", color.var = "Assemblage")
+  })
   
   #plot across all 
   # output$plot1<-renderPlot({
   pt1<-reactive({
     if (input$analysis == "Site statistics" ) {
-    #  to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice) %>% pull(sample_id)
-     # phyloseq_object_prune<-prune_samples(to_prune,phyloseq_object())
-        #Fish.OTU <- as(otu_table(phyloseq_object()), "matrix")
-      #Fish_OTU_df = as.data.frame((Fish.OTU))
-      #Fish_OTU_df= t(Fish_OTU_df)
-      #raremax_df <- min(rowSums(Fish_OTU_df))
-      #p<-rarecurve(Fish_OTU_df, step = 100, sample = 1, col = 'blue', cex = 0.5,label=FALSE)
       p<-ggrare(phyloseq_object(), color = "CollectionDate", label = "Sample",step = 100, se = FALSE) + theme_bw()
+      p$data$CollectionDate <- factor(p$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(p$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
     if (input$analysis == "Site analysis" ) {
-     # to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice) %>% pull(sample_id)
-     # phyloseq_object_prune<-prune_samples(to_prune,phyloseq_object())
-      #        phyloseq_object_prune<-prune_samples(phyloseq_object(), HBRC_Site_Name == input$site_choice)
       phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa') #pa dataset
       FisheDNA.ord <- ordinate(phyloseq_object_prune.pa, "NMDS", "jaccard") 
       p<-plot_ordination(phyloseq_object(), FisheDNA.ord, type="samples", color="CollectionDate") + theme_bw()+ stat_ellipse(type = "norm", linetype = 2) +ggtitle("NMDS")
@@ -153,25 +166,41 @@ function(input, output, session) {
     p
   })
   pt2 <- reactive({
-    if (input$analysis == "Site statistics") return(NULL)
-    to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice)  %>% .[order(as.Date(.$CollectionDate, format="%d/%m/%Y")),] %>% pull(sample_id)
-#    phyloseq_object_prune<-prune_samples(to_prune,phyloseq_object())
+    if (input$analysis == "Site statistics") 
+    {
+     pbar<- ggiNEXT3D(inext_object(), type = 2, facet.var = "Order.q", color.var = "Assemblage")
+    # pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
+     #not sure how to reorder by date for innext plot object
+    }
+    if (input$analysis == "Site analysis") 
+    {    to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice)  %>% .[order(as.Date(.$CollectionDate, format="%d/%m/%Y")),] %>% pull(sample_id)
     phyloseq_object_prune<-ps_reorder(phyloseq_object(), to_prune)
-    #   https://github.com/joey711/phyloseq/issues/1075
-    #reordering not working must be something to do with this but not sure
-    pbar = plot_bar(phyloseq_object_prune, "CollectionDate", fill="Class")
+    pbar = plot_bar(phyloseq_object_prune, "CollectionDate", fill="Class") + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Presence/absence") +   theme(legend.position="none")
     #do presence/absence plot
     #p1 = plot_bar(Fish.eDNA.pa, "location_date", fill="Class")
     #relevel to order chart
     pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
-    pbar + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
-      ggtitle("Presence/absence") +
-      #  ggtitle("Read abundance across HBRC_Sites")+
-      theme(legend.key.size = unit(0.03, 'cm'))+ theme(legend.position="none")#+theme(axis.text=element_text(size=4),axis.title=element_text(size=10,face="bold"))#
-    
-  })
+    #pbar + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Presence/absence") +   theme(legend.position="none") 
+    #+theme(axis.text=element_text(size=4),axis.title=element_text(size=10,face="bold"))#theme(legend.key.size = unit(0.03, 'cm'))+
+    }
+    pbar
+      })
+  pt3 <- reactive({
+    if (input$analysis == "Site statistics") {return(NULL)}
+    if (input$analysis == "Site analysis") 
+    {
+     # pbar<- ggiNEXT3D(inext_object(), type = 2, facet.var = "Order.q", color.var = "Assemblage")
+    #  pbar<- ggiNEXT3D(inext_object(), type = 1, facet.var = 'Assemblage') + facet_wrap(~Assemblage, nrow = 3)
+      pbar<- ggiNEXT3D(inext_object(), type = 1, facet.var = "Order.q")
+      
+      # pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
+      #not sure how to reorder by date for innext plot object
+    }
+    pbar
+    })
+  
   output$plot1 = renderPlot({
-    ptlist <- list(pt1(),pt2())
+    ptlist <- list(pt1(),pt2(),pt3())
     # remove the null plots from ptlist and wtlist
     to_delete <- !sapply(ptlist,is.null)
     ptlist <- ptlist[to_delete] 
@@ -180,3 +209,4 @@ function(input, output, session) {
   })
   
 }
+

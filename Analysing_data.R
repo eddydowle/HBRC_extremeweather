@@ -237,6 +237,28 @@ p + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
  theme(legend.position="none")#+
   scale_fill_manual(values = mycolors) + scale_color_manual(values = mycolors)
 
+  p$data
+  
+  ptest = plot_bar(FisheDNA.5, "CollectionDate", fill="Class") + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Read Abundance") + theme_bw()+  theme(legend.position="none")
+  ptest
+  test_data<-ptest$data
+  ptest$plot_env
+  
+  ggplot(test_data, aes(fill=Class, y=Abundance, x=CollectionDate)) + 
+    geom_bar(position="stack", stat="identity")
+  
+  #labeling only the top ten classes
+  top_10class<-test_data %>% group_by(Class) %>% drop_na(Class) %>%  summarise(Abundance = sum(Abundance,na.rm=TRUE)) %>% arrange(desc(Abundance)) %>% slice_max(Abundance, n = 10,with_ties=FALSE)
+      data_fish_top10 <- test_data %>% 
+       mutate(Class_top10 = ifelse (!Class %in% top_10class$Class, "Other", Class))
+  #make a colour pallet of 11 colours (grey at the end for other)
+    col_brew<-c(brewer.pal(n = 10, name = "Paired"),"#808080")
+  #relevel other to end
+   data_fish_top10$Class_top10 <- forcats::fct_relevel(data_fish_top10$Class_top10, "Other", after = Inf)
+  
+   ggplot(data_fish_top10, aes(fill=Class_top10, y=Abundance, x=CollectionDate)) + 
+     geom_bar(position="stack", stat="identity")+ scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title="Top 10 Classes"))+ theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Read Abundance")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+   
 #presence absence plot
   
   p = plot_bar(Fish.eDNA.pa,  fill="Class")
@@ -294,6 +316,27 @@ relabundance_plot + geom_bar(aes(), stat="identity", position="fill") + theme(ax
 #+
   theme(legend.key.size = unit(0.03, 'cm'))
 
+
+#find top 10 classes in dataset
+top_10class<-data_fish %>% group_by(Class) %>% drop_na(Class) %>%  summarise(Abundance = sum(Abundance,na.rm=TRUE)) %>% arrange(desc(Abundance)) %>% slice_max(Abundance, n = 10)
+top_10class$Class
+#then everything that is not in top_10class gets mutated into 'other' category
+#https://stackoverflow.com/questions/71595962/conditional-mutate-by-matching-strings-or-characters
+
+data_fish_top10 <- data_fish %>% 
+  mutate(Class_top10 = ifelse (!Class %in% top_10class$Class, "Other", Class))
+relabundance_plot <- ggplot(data=data_fish_top10, aes(x=Sample, y=Abundance, fill=Class_top10)) + facet_grid(~Year, scales = "free")
+relabundance_plot + geom_bar(aes(), stat="identity", position="fill") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+
+col_brew<-c(brewer.pal(n = 10, name = "Paired"),"#808080")
+col_brew
+
+data_fish_top10$Class_top10 <- forcats::fct_relevel(data_fish_top10$Class_top10, "Other", after = Inf)
+
+relabundance_plot <- ggplot(data=data_fish_top10, aes(x=Sample, y=Abundance, fill=Class_top10)) + facet_grid(~Year, scales = "free")
+relabundance_plot + geom_bar(aes(), stat="identity", position="fill") +theme_bw()+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title="Top 10 Classes"))+ theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))
+
+?slice_max
 pbar = plot_bar(FisheDNA.5, "CollectionDate", fill="Class")
 #do presence/absence plot
 pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"))
@@ -323,6 +366,24 @@ sort(format(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y"), "20%y-
 dplyr::arrange(data, as.POSIXct(pbar$data$CollectionDate))
 pbar$data$Sample <- factor(pbar$data$Sample, levels = desired_order)
 pbar
+
+#turning everything under say 5% to other and to cut down on the legend
+plot_5<-transform_sample_counts(FisheDNA.5, function(x) 100 * x/sum(x))
+tax_table(plot_5)
+#FisheDNA.6 = transform_sample_counts(FisheDNA.5, function(x) x / sum(x) )
+glom <- tax_glom(plot_5, taxrank = 'Class')
+glom # should list taxa as phyla
+data_glom<- psmelt(glom) # create dataframe from phyloseq object
+data_glom$Class <- as.character(data_glom$Class) #convert to character
+data_glom$Class[data_glom$Abundance < 0.25] <- "<25% abundance"
+Count = length(unique(data_glom$Class)); Count
+unique(data_glom$Class) #add into line below
+
+spatial_plot <- ggplot(data_glom, aes(x=Sample, y=Abundance, fill=Class)) + facet_grid(~location_date, scales = "free")
+
+spatial_plot + geom_bar(aes(), stat="identity", position="stack") + labs (title = "Relative abudance", x="Stage of Decomposition", y= "Relative Abundance", ) + theme(legend.position="bottom", plot.title = element_text(hjust=0.5)) + guides(fill=guide_legend(nrow=4))
+
+names(sort(taxa_sums(FisheDNA.5), TRUE)[1:10])
 
 
 #Lets get these objects out of phyloseq and use them for further analysis
@@ -410,8 +471,59 @@ for (category in categories) {
 
 out.raw <- iNEXT3D(data = matrix_list$data, diversity = 'TD', q = c(0, 1, 2), datatype = 'incidence_raw', nboot = 50)
 
-ggiNEXT3D(out.raw, type = 1, facet.var = 'Assemblage') + facet_wrap(~Assemblage, nrow = 3)
-ggiNEXT3D(out.raw, type = 1, facet.var = "Order.q")
+innext_plot<-ggiNEXT3D(out.raw, type = 1, facet.var = 'Assemblage') + facet_wrap(~Assemblage, nrow = 3)
+innext_plot
+innext_plot$theme
+?innext_plot
+
+plotdf<-fortify.iNEXT(out.raw, type=1)
+
+
+innext_plot$data$Assemblage <- factor(innext_plot$data$Assemblage, levels = c('Esk Rvr at Berry Rd_24/02/22','Esk Rvr at Berry Rd_20/04/23','Esk Rvr at Berry Rd_30/08/23','Esk Rvr at Berry Rd_16/11/23','Esk Rvr at Berry Rd_24/01/24'))
+out.raw$TDInfo$Assemblage<- factor(out.raw$TDInfo$Assemblage, levels = c('Esk Rvr at Berry Rd_24/02/22','Esk Rvr at Berry Rd_20/04/23','Esk Rvr at Berry Rd_30/08/23','Esk Rvr at Berry Rd_16/11/23','Esk Rvr at Berry Rd_24/01/24'))
+factor(out.raw$TDInfo$Assemblage)
+
+innext_plot<-ggiNEXT3D(out.raw, type = 1, facet.var = "Order.q")
+innext_plot+ theme(plot.title = element_text(size=10),text = element_text(size = 10))+ theme(legend.position="none")
+innext_plot$layers
+
+#this does not solve all the issues for some reason I cant change the factor of the shape but can the colour so shifting the colour over to ordered and just turning of the shape legend. 
+innext_plot$data$shape <- factor(innext_plot$data$shape, levels = c('Esk Rvr at Berry Rd_24/02/22','Esk Rvr at Berry Rd_20/04/23','Esk Rvr at Berry Rd_30/08/23','Esk Rvr at Berry Rd_16/11/23','Esk Rvr at Berry Rd_24/01/24'))
+#have tried the same on Assemblage and shape columns in data table but no dice, not sure why its not working. Also tried changing factor of inext.3d object out.raw and didnt work either
+innext_plot+ theme(plot.title = element_text(size=8),text = element_text(size = 8))+theme(legend.position = "right") +theme(legend.text=element_text(size=6))+guides(shape = "none") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +theme(legend.key.size = unit(0.5,"line")) 
+#cant seem to change the legend size without stuffing up the rest of the legend
+
++ guides(colour = guide_legend(override.aes = list(size=2)))
+
++ guides(colour = guide_legend(override.aes = list(alpha=1)))
+
++ guides(linetype = guide_legend(override.aes = list(size = 0.5)))
+
++guides(col = guide_legend(override.aes = list(size = 0.5)))
+  
+  theme(legend.key.size = unit(0.5,"line"))
+
+
+
+innext_plot$data$Assemblage <- factor(innext_plot$data$Assemblage, levels = c('Esk Rvr at Berry Rd_24/02/22','Esk Rvr at Berry Rd_20/04/23','Esk Rvr at Berry Rd_30/08/23','Esk Rvr at Berry Rd_16/11/23','Esk Rvr at Berry Rd_24/01/24'))
+
+innext_plot$data$shape <- factor(innext_plot$data$shape, levels = c('Esk Rvr at Berry Rd_24/02/22','Esk Rvr at Berry Rd_20/04/23','Esk Rvr at Berry Rd_30/08/23','Esk Rvr at Berry Rd_16/11/23','Esk Rvr at Berry Rd_24/01/24'))
+
+innext_plot$data$col <- factor(innext_plot$data$col, levels = c('Esk Rvr at Berry Rd_24/02/22','Esk Rvr at Berry Rd_20/04/23','Esk Rvr at Berry Rd_30/08/23','Esk Rvr at Berry Rd_16/11/23','Esk Rvr at Berry Rd_24/01/24'))
+
++geom_line(size=1)
+
++ scale_fill_discrete(limits = c('Esk Rvr at Berry Rd_24/02/22','Esk Rvr at Berry Rd_20/04/23','Esk Rvr at Berry Rd_30/08/23','Esk Rvr at Berry Rd_16/11/23','Esk Rvr at Berry Rd_24/01/24'))+ scale_fill_discrete(limits = c('Esk Rvr at Berry Rd_24/02/22','Esk Rvr at Berry Rd_20/04/23','Esk Rvr at Berry Rd_30/08/23','Esk Rvr at Berry Rd_16/11/23','Esk Rvr at Berry Rd_24/01/24'))
+
+
+
+innext_plot+ theme(plot.title = element_text(size=10),text = element_text(size = 10),axis.text.x=element_blank())
+
+innext_plot+ theme(legend.title=element_text(size=6))+theme(axis.text=element_text(size=6))
+innext_plot+ scale_fill_discrete(limits = c('Esk Rvr at Berry Rd_24/02/22','Esk Rvr at Berry Rd_20/04/23','Esk Rvr at Berry Rd_30/08/23','Esk Rvr at Berry Rd_16/11/23','Esk Rvr at Berry Rd_24/01/24'))
+
+unique(innext_plot$data$Assemblage)
+
 ggiNEXT3D(out.raw, type = 2, facet.var = "Order.q", color.var = "Assemblage")
 
 ggiNEXT3D(out.raw, type = 2, facet.var = "Order.q", color.var = "Assemblage") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))+

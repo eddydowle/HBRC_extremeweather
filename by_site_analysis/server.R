@@ -169,38 +169,119 @@ for (category in categories) {
     if (input$analysis == "Site statistics") 
     {
      pbar<- ggiNEXT3D(inext_object(), type = 2, facet.var = "Order.q", color.var = "Assemblage")
-    # pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
+     #this does not solve all the issues for some reason I cant change the factor of the shape but can the colour so shifting the colour over to ordered and just turning of the shape legend. 
+     pbar$data$col <- factor(pbar$data$col, levels = str_remove(format(sort(as.Date(unique(pbar$data$shape), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
+     #have tried the same on Assemblage and shape columns in data table but no dice, not sure why its not working. Also tried changing factor of inext.3d object out.raw and didnt work either
+     pbar<-pbar+ theme(plot.title = element_text(size=8),text = element_text(size = 8))+theme(legend.position = "right") +theme(legend.text=element_text(size=6))+guides(shape = "none") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +theme(legend.key.size = unit(0.5,"line"))
+     
+     # pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
      #not sure how to reorder by date for innext plot object
-    }
+     #trying to reset the colours to ggplots default colours
+     gg_color_hue <- function(n) {
+       hues = seq(15, 375, length = n + 1)
+       hcl(h = hues, l = 65, c = 100)[1:n]
+     }
+     n = length(unique(pbar$data$shape))
+     cols = gg_color_hue(n)
+     pbar<-pbar+scale_color_manual(values = cols)+scale_fill_manual(values = cols)
+         }
     if (input$analysis == "Site analysis") 
-    {    to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice)  %>% .[order(as.Date(.$CollectionDate, format="%d/%m/%Y")),] %>% pull(sample_id)
-    phyloseq_object_prune<-ps_reorder(phyloseq_object(), to_prune)
-    pbar = plot_bar(phyloseq_object_prune, "CollectionDate", fill="Class") + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Presence/absence") +   theme(legend.position="none")
-    #do presence/absence plot
-    #p1 = plot_bar(Fish.eDNA.pa, "location_date", fill="Class")
-    #relevel to order chart
-    pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
-    #pbar + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Presence/absence") +   theme(legend.position="none") 
-    #+theme(axis.text=element_text(size=4),axis.title=element_text(size=10,face="bold"))#theme(legend.key.size = unit(0.03, 'cm'))+
+    {    
+      phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa') #pa dataset
+      rich<-estimate_richness(phyloseq_object_prune.pa, measures=c("Observed"))
+      Fish_Sample = as(sample_data(phyloseq_object_prune.pa), "matrix")
+      rich<-cbind(rich, Fish_Sample)
+      pbar<-ggplot(rich, aes(x=CollectionDate, y=Observed, colour = CollectionDate)) +
+        geom_boxplot() + ggtitle("Species Richness") +
+        ylab("Observed zotu richness")+
+        theme_bw() +
+        theme(axis.text.x = element_text(angle = 90, hjust=1))#+theme(axis.text=element_text(size=4),axis.title=element_text(size=12))
+     pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
     pbar
       })
   pt3 <- reactive({
-    if (input$analysis == "Site statistics") {return(NULL)}
+    if (input$analysis == "Site statistics") {    
+      to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice)  %>% .[order(as.Date(.$CollectionDate, format="%d/%m/%Y")),] %>% pull(sample_id)
+    phyloseq_object_prune<-ps_reorder(phyloseq_object(), to_prune)
+    ptest = plot_bar(phyloseq_object_prune, "CollectionDate", fill=input$level) + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Read Abundance") + theme_bw()+  theme(legend.position="none")
+    test_data<-ptest$data
+    #labeling only the top ten classes or genera
+    top_10class<-test_data %>% group_by(!! sym(input$level)) %>% drop_na(!! sym(input$level)) %>%  summarise(Abundance = sum(Abundance,na.rm=TRUE)) %>% arrange(desc(Abundance)) %>% slice_max(Abundance, n = 10,with_ties=FALSE) %>% mutate(top10group= !! sym(input$level))
+#    print(top_10class)
+    #maybe change the column name then dont have the issue of selecting a column using input
+    data_fish_top10 <- test_data %>% 
+      mutate(top10 = ifelse (! (!! sym(input$level)) %in% top_10class$top10group, "Other", !! sym(input$level)))
+ #   print(data_fish_top10)
+    #make a colour pallet of 11 colours (grey at the end for other)
+    col_brew<-c(brewer.pal(n = 10, name = "Paired"),"#808080")
+    #relevel other to end
+    data_fish_top10$top10 <- forcats::fct_relevel(data_fish_top10$top10, "Other", after = Inf)
+    pbar<-ggplot(data_fish_top10, aes(fill=top10, y=Abundance, x=CollectionDate)) + 
+      geom_bar(position="stack", stat="identity")+ scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title=paste("Top 10",input$level)))+theme_bw() +theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Read Abundance")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+    pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
+    }
     if (input$analysis == "Site analysis") 
     {
-     # pbar<- ggiNEXT3D(inext_object(), type = 2, facet.var = "Order.q", color.var = "Assemblage")
     #  pbar<- ggiNEXT3D(inext_object(), type = 1, facet.var = 'Assemblage') + facet_wrap(~Assemblage, nrow = 3)
       pbar<- ggiNEXT3D(inext_object(), type = 1, facet.var = "Order.q")
-      
+      #this does not solve all the issues for some reason I cant change the factor of the shape but can the colour so shifting the colour over to ordered and just turning of the shape legend. 
+      pbar$data$col <- factor(pbar$data$col, levels = str_remove(format(sort(as.Date(unique(pbar$data$shape), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
+      #have tried the same on Assemblage and shape columns in data table but no dice, not sure why its not working. Also tried changing factor of inext.3d object out.raw and didnt work either
+      pbar<-pbar+ theme(plot.title = element_text(size=8),text = element_text(size = 8))+theme(legend.position = "right") +theme(legend.text=element_text(size=6))+guides(shape = "none") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +theme(legend.key.size = unit(0.5,"line")) 
+      #cant seem to change the legend size without stuffing up the rest of the legend
       # pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
       #not sure how to reorder by date for innext plot object
+      #trying to reset the colours to ggplots default colours
+      gg_color_hue <- function(n) {
+        hues = seq(15, 375, length = n + 1)
+        hcl(h = hues, l = 65, c = 100)[1:n]
+      }
+      n = length(unique(pbar$data$shape))
+      cols = gg_color_hue(n)
+      pbar<-pbar+scale_color_manual(values = cols)+scale_fill_manual(values = cols)
+      }
+    pbar
+    })
+  
+  pt4 <- reactive({
+    if (input$analysis == "Site statistics") { return(NULL)}
+    if (input$analysis == "Site analysis") {
+      #bar chart of species proportions per site
+      #abundances from P/A dataset
+ #     phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa') #pa dataset
+ #     FisheDNA.6 = transform_sample_counts(phyloseq_object_prune.pa, function(x) x / sum(x) )
+     #raw abundances not P/A
+      FisheDNA.6 = transform_sample_counts(phyloseq_object(), function(x) x / sum(x) )
+      data_fish <- psmelt(FisheDNA.6)
+      #find top 10 classes in dataset
+      top_10class<-data_fish %>% group_by(!! sym(input$level)) %>% drop_na(!! sym(input$level)) %>%  summarise(Abundance = sum(Abundance,na.rm=TRUE)) %>% arrange(desc(Abundance)) %>% slice_max(Abundance, n = 10,with_ties=FALSE) %>% mutate(top10group= !! sym(input$level))
+      #    print(top_10class)
+      #maybe change the column name then dont have the issue of selecting a column using input
+      data_fish_top10 <- data_fish %>% 
+        mutate(top10 = ifelse (! (!! sym(input$level)) %in% top_10class$top10group, "Other", !! sym(input$level)))
+      
+ #     top_10class<-data_fish %>% group_by(Class) %>% drop_na(Class) %>%  summarise(Abundance = sum(Abundance,na.rm=TRUE)) %>% arrange(desc(Abundance)) %>% slice_max(Abundance, n = 10,with_ties=FALSE)
+      #then everything that is not in top_10class gets mutated into 'other' category
+      #https://stackoverflow.com/questions/71595962/conditional-mutate-by-matching-strings-or-characters
+    #  data_fish_top10 <- data_fish %>% 
+     #   mutate(Class_top10 = ifelse (!Class %in% top_10class$Class, "Other", Class))
+      #make a colour pallet of 11 colours (grey at the end for other)
+      col_brew<-c(brewer.pal(n = 10, name = "Paired"),"#808080")
+      #relevel other to end
+      data_fish_top10$top10 <- forcats::fct_relevel(data_fish_top10$top10, "Other", after = Inf)
+     pbar <- ggplot(data=data_fish_top10, aes(x=Sample, y=Abundance, fill=top10)) + facet_grid(~Year, scales = "free")
+      pbar<-pbar + geom_bar(aes(), stat="identity", position="fill") +theme_bw()+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title=paste("Top 10",input$level)))+ theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Relative Read Abundance")
+      
+    #  pbar <- ggplot(data=data_fish, aes(x=Sample, y=Abundance, fill=Class)) + facet_grid(~CollectionDate, scales = "free") + geom_bar(aes(), stat="identity", position="fill") + ggtitle("Relative abundance P/A") + theme(legend.key.size = unit(0.03, 'cm')) +theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),axis.title=element_text(size=10,face="bold"),axis.text=element_text(size=6))
+        #theme(axis.text=element_text(size=4),axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),axis.title=element_text(size=10,face="bold"))
+ pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
     pbar
     })
   
   output$plot1 = renderPlot({
-    ptlist <- list(pt1(),pt2(),pt3())
+    ptlist <- list(pt1(),pt2(),pt3(),pt4())
     # remove the null plots from ptlist and wtlist
     to_delete <- !sapply(ptlist,is.null)
     ptlist <- ptlist[to_delete] 

@@ -21,7 +21,7 @@ fluidPage(
   sidebarLayout(
     sidebarPanel(
       selectInput("analysis","Select Analysis",choices =c('Site statistics','Site analysis'), selected = 'Site analysis'),
-      selectInput("assay", "Select Assay",
+            selectInput("assay", "Select Assay",
                   choices =c("CI","BE","BU","MZ","RV","TP","UM","WV"), selected='CI'),
       selectInput('site_choice',"Select site", unique(meta_data$HBRC_Site_Name)),
       conditionalPanel(
@@ -34,11 +34,15 @@ fluidPage(
       ,
       conditionalPanel(
         "input.assay=='WV'",
-        pickerInput("subset_data_WV", "Select otu's", c("All","Just freshwater"),multiple = F))
-    ),
-    
+        pickerInput("subset_data_WV", "Select otu's", c("All","Just freshwater"),multiple = F)),
+      selectInput("level", "Select classification level (barchart colours only)",
+                  choices =c("Class","Genus"), selected='CI')
+    ,width = 3),
+   # mainPanel("main panel",
+#              column(6,plotOutput(outputId="plot1", width="500px",height="400px"),width = 10)
+              
     mainPanel("main panel",
-              column(6,plotOutput(outputId="plot1", width="500px",height="400px"))
+              column(6,plotOutput(outputId="plot1", width="1000px",height="400px"))
     )
     
     # Show a plot of the generated distribution

@@ -788,14 +788,21 @@ library(RColorBrewer)
 
 #load the metadata file
 meta_data_map<-read.table('Wilderlab_meta_map.txt',sep='\t',quote='',header =T)
-
+meta_data_map<-read.table('OneDrive_1_7-05-2024/Wilderlab_meta_map.txt',sep='\t',quote='',header =T)
 
 leaflet(meta_data_map) %>% addTiles() %>%
   addMarkers(~Longitude_hbrc, ~Latitude_hbrc, popup = ~paste(HBRC_Site_Name, paste('N Uniq Sample Dates:', n_uniq_samplingdates,sep =' '), sep = "<br>"))
 
 
 pal <- colorFactor(
-  palette = 'Dark2',
+  palette = 'Blues',
+  domain = meta_data_map$n_uniq_samplingdates
+)
+
+my_palette <- brewer.pal(name="YlOrBr",n=9)[4:9]
+
+pal <- colorFactor(
+  palette = my_palette,
   domain = meta_data_map$n_uniq_samplingdates
 )
 
@@ -803,13 +810,32 @@ leaflet(meta_data_map) %>%
   addTiles() %>%
   addCircleMarkers(~Longitude_hbrc, ~Latitude_hbrc,
                    popup = ~paste(HBRC_Site_Name),
-                    color = ~ pal(n_uniq_samplingdates),
-                   stroke = FALSE, fillOpacity = 1) %>% 
+                   color='black',
+                    fillColor = ~ pal(n_uniq_samplingdates),
+                   stroke = FALSE, fillOpacity = 1,radius =6) %>% 
+  addProviderTiles("PenStreetMap.France") %>%
   addLegend("bottomright", pal = pal, values = ~n_uniq_samplingdates,
+            title = NULL,
+            opacity = 1) 
+leafletOptions(resolutions = 1200)
+?leafletOptions
+?leaflet
+pal <- colorFactor(
+  palette = my_palette,
+  domain = meta_data_map$n_uniq_samplingdates
+)
+
+leaflet(meta_data_map) %>% 
+  addTiles() %>%
+  addCircleMarkers(~Longitude_hbrc, ~Latitude_hbrc,
+                   popup = ~paste(HBRC_Site_Name),
+                   color='black',
+                   fillColor = ~ my_palette,
+                   stroke = FALSE, fillOpacity = 1,radius =6) %>% 
+  addLegend("bottomright", colors = my_palette, values = ~n_uniq_samplingdates,
             title = "# unique sampling dates",
             opacity = 1) 
-
-
+length(unique(meta_data_map$n_uniq_samplingdates))
 #toanga species map#
 #just from everything?
 #just plot out presence before and after

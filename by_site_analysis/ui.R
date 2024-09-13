@@ -11,8 +11,9 @@
 
 library(shiny)
 library(shinyWidgets)
+library(shinythemes)
 # Define UI for application that draws a histogram
-fluidPage(
+fluidPage(theme = shinytheme("united"),
   
   # Application title
   titlePanel("eDNA by site"),
@@ -24,6 +25,9 @@ fluidPage(
             selectInput("assay", "Select Assay",
                   choices =c("CI","BE","BU","MZ","RV","TP","UM","WV"), selected='CI'),
       selectInput('site_choice',"Select site", unique(meta_data$HBRC_Site_Name)),
+      conditionalPanel(
+        "input.analysis=='Site analysis'",
+        pickerInput("diversity_measure", "Alpha diversity type", c("Observed", "Chao1",  "Shannon", "Simpson", "InvSimpson"),multiple = F)),
       conditionalPanel(
         "input.assay=='CI'",
         pickerInput("subset_data_CI", "Select otu's", c("All","Just freshwater"),multiple = F))

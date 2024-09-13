@@ -128,7 +128,8 @@ function(input, output, session) {
   split_physeq_list <- list()
   print(categories)
 for (category in categories) {
-    remove_idx = as.character(get_variable(phyloseq.pa, "CollectionDate")) != category
+    print(category)
+    remove_idx = as.character(get_variable(phyloseq.pa, "CollectionDate")) == category
     sub_physeq.100 <- prune_samples(remove_idx, phyloseq.pa)
     split_physeq_list[[category]] <- otu_table(sub_physeq.100)}
   matrix_list <- lapply(split_physeq_list, function(x) {
@@ -141,6 +142,7 @@ for (category in categories) {
     otu_table <- as(otu_table(split_physeq_list[[category]]), "matrix")
     matrix_list[["data"]][[category]] <- otu_table
   }
+#  print(matrix_list)
   out.raw <- iNEXT3D(data = matrix_list$data, diversity = 'TD', q = c(0, 1, 2), datatype = 'incidence_raw', nboot = 50)
   return(out.raw)
   #type 1 for site stats
@@ -156,11 +158,14 @@ for (category in categories) {
     if (input$analysis == "Site statistics" ) {
       p<-ggrare(phyloseq_object(), color = "CollectionDate", label = "Sample",step = 100, se = FALSE) + theme_bw()
       p$data$CollectionDate <- factor(p$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(p$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
+      p<-p+ theme(axis.text.x = element_text(size = 7, angle = 90, vjust = 0.5, hjust=1)) + theme(legend.title = element_text(size = 8),legend.text = element_text(size = 7)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Rarefraction Curve")+ labs(colour = "Sampling Date")#guides(fill=guide_legend(title='Sampling Date'))
+
     }
     if (input$analysis == "Site analysis" ) {
       phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa') #pa dataset
       FisheDNA.ord <- ordinate(phyloseq_object_prune.pa, "NMDS", "jaccard") 
-      p<-plot_ordination(phyloseq_object(), FisheDNA.ord, type="samples", color="CollectionDate") + theme_bw()+ stat_ellipse(type = "norm", linetype = 2) +ggtitle("NMDS")
+      p<-plot_ordination(phyloseq_object(), FisheDNA.ord, type="samples", color="CollectionDate") + theme_bw()+ stat_ellipse(type = "norm", linetype = 2) +ggtitle("NMDS")+ labs(colour = "Sampling Date")+
+      theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.5, hjust=1),axis.text.y = element_text(size = 8),axis.title=element_text(size=11)) 
       p$data$CollectionDate <- factor(p$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(p$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
     p
@@ -172,8 +177,9 @@ for (category in categories) {
      #this does not solve all the issues for some reason I cant change the factor of the shape but can the colour so shifting the colour over to ordered and just turning of the shape legend. 
      pbar$data$col <- factor(pbar$data$col, levels = str_remove(format(sort(as.Date(unique(pbar$data$shape), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
      #have tried the same on Assemblage and shape columns in data table but no dice, not sure why its not working. Also tried changing factor of inext.3d object out.raw and didnt work either
-     pbar<-pbar+ theme(plot.title = element_text(size=8),text = element_text(size = 8))+theme(legend.position = "right") +theme(legend.text=element_text(size=6))+guides(shape = "none") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +theme(legend.key.size = unit(0.5,"line"))
+    # pbar<-pbar+ theme(plot.title = element_text(size=8),text = element_text(size = 8))+theme(legend.position = "right") +theme(legend.text=element_text(size=6))+guides(shape = "none") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +theme(legend.key.size = unit(0.5,"line"))
      
+     pbar<-pbar+ theme(legend.text = element_text(size = 8),title =element_text(size=12)) + ggtitle("Sampling Curve")+theme(legend.position = "right")+ theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.5, hjust=1),axis.text.y = element_text(size = 8),axis.title=element_text(size=11)) +theme(legend.title=element_blank())+theme(legend.key.size = unit(0.1,"line"))+theme(legend.key.height=unit(0.1, "cm"))+guides(shape = "none")
      # pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
      #not sure how to reorder by date for innext plot object
      #trying to reset the colours to ggplots default colours
@@ -188,14 +194,15 @@ for (category in categories) {
     if (input$analysis == "Site analysis") 
     {    
       phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa') #pa dataset
-      rich<-estimate_richness(phyloseq_object_prune.pa, measures=c("Observed"))
+      rich<-estimate_richness(phyloseq_object_prune.pa, measures=c(input$diversity_measure))
       Fish_Sample = as(sample_data(phyloseq_object_prune.pa), "matrix")
       rich<-cbind(rich, Fish_Sample)
-      pbar<-ggplot(rich, aes(x=CollectionDate, y=Observed, colour = CollectionDate)) +
+      pbar<-ggplot(rich, aes(x=CollectionDate, y=!! sym(input$diversity_measure), colour = CollectionDate)) +
         geom_boxplot() + ggtitle("Species Richness") +
-        ylab("Observed zotu richness")+
+        ylab(paste(input$diversity_measure,"richness estimate"))+
         theme_bw() +
-        theme(axis.text.x = element_text(angle = 90, hjust=1))#+theme(axis.text=element_text(size=4),axis.title=element_text(size=12))
+        theme(axis.text.x = element_text(size = 8,angle = 90, hjust=1))+ labs(colour = "Sampling Date",x="Sampling Date")+theme(        axis.text.y = element_text(size = 8),axis.title=element_text(size=11))
+      #+theme(axis.text=element_text(size=4),axis.title=element_text(size=12))
      pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
     pbar
@@ -218,7 +225,9 @@ for (category in categories) {
     #relevel other to end
     data_fish_top10$top10 <- forcats::fct_relevel(data_fish_top10$top10, "Other", after = Inf)
     pbar<-ggplot(data_fish_top10, aes(fill=top10, y=Abundance, x=CollectionDate)) + 
-      geom_bar(position="stack", stat="identity")+ scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title=paste("Top 10",input$level)))+theme_bw() +theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Read Abundance")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+      geom_bar(position="stack", stat="identity")+ scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title=paste("Top 10",input$level)))+theme_bw()+ theme(axis.text.x = element_text(size = 7, angle = 90, vjust = 0.5, hjust=1)) + theme(legend.title = element_text(size = 8),legend.text = element_text(size = 7)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Read Abundance")
+    
+   # +theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Read Abundance")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
     pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
     if (input$analysis == "Site analysis") 
@@ -228,7 +237,11 @@ for (category in categories) {
       #this does not solve all the issues for some reason I cant change the factor of the shape but can the colour so shifting the colour over to ordered and just turning of the shape legend. 
       pbar$data$col <- factor(pbar$data$col, levels = str_remove(format(sort(as.Date(unique(pbar$data$shape), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
       #have tried the same on Assemblage and shape columns in data table but no dice, not sure why its not working. Also tried changing factor of inext.3d object out.raw and didnt work either
-      pbar<-pbar+ theme(plot.title = element_text(size=8),text = element_text(size = 8))+theme(legend.position = "right") +theme(legend.text=element_text(size=6))+guides(shape = "none") + theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) +theme(legend.key.size = unit(0.5,"line")) 
+      pbar<-pbar + theme(legend.text = element_text(size = 8),title =element_text(size=12)) + ggtitle("Hill Numbers")+ theme(strip.text.x = element_text(size = 6))+theme(legend.position = "right")+ theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.5, hjust=1),axis.text.y = element_text(size = 8),axis.title=element_text(size=11)) +theme(legend.title=element_blank())+theme(legend.key.size = unit(0.1,"line"))+theme(legend.key.height=unit(0.1, "cm"))+guides(shape = "none")
+      #legend.title = element_text(size = 8),
+    #  pbar<-pbar+ theme(plot.title = element_text(size=8),text = element_text(size = 8))+theme(legend.position = "right") +theme(legend.text=element_text(size=6))+guides(shape = "none") + theme(axis.text.x = element_text(size = 6, angle = 90, vjust = 0.5, hjust=1)) +theme(legend.key.size = unit(0.5,"line")) 
+     # + theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Relative Read Abundance")+ theme(strip.text.x = element_text(size = 6))
+      
       #cant seem to change the legend size without stuffing up the rest of the legend
       # pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
       #not sure how to reorder by date for innext plot object
@@ -270,8 +283,8 @@ for (category in categories) {
       col_brew<-c(brewer.pal(n = 10, name = "Paired"),"#808080")
       #relevel other to end
       data_fish_top10$top10 <- forcats::fct_relevel(data_fish_top10$top10, "Other", after = Inf)
-     pbar <- ggplot(data=data_fish_top10, aes(x=Sample, y=Abundance, fill=top10)) + facet_grid(~Year, scales = "free")
-      pbar<-pbar + geom_bar(aes(), stat="identity", position="fill") +theme_bw()+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1)) + scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title=paste("Top 10",input$level)))+ theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Relative Read Abundance")
+     pbar <- ggplot(data=data_fish_top10, aes(x=Sample, y=Abundance, fill=top10)) + facet_grid(~CollectionDate, scales = "free")
+      pbar<-pbar + geom_bar(aes(), stat="identity", position="fill") +theme_bw()+ theme(axis.text.x = element_text(size = 6, angle = 90, vjust = 0.5, hjust=1)) + scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title=paste("Top 10",input$level)))+ theme(legend.title = element_text(size = 8),legend.text = element_text(size = 7)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Relative Read Abundance")+ theme(strip.text.x = element_text(size = 6,angle = 90))
       
     #  pbar <- ggplot(data=data_fish, aes(x=Sample, y=Abundance, fill=Class)) + facet_grid(~CollectionDate, scales = "free") + geom_bar(aes(), stat="identity", position="fill") + ggtitle("Relative abundance P/A") + theme(legend.key.size = unit(0.03, 'cm')) +theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),axis.title=element_text(size=10,face="bold"),axis.text=element_text(size=6))
         #theme(axis.text=element_text(size=4),axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),axis.title=element_text(size=10,face="bold"))

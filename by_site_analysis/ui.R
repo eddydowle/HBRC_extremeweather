@@ -42,18 +42,24 @@ fluidPage(theme = shinytheme("united"),
       selectInput("level", "Select classification level (barchart colours only)",
                   choices =c("Class","Genus"), selected='CI')
     ,width = 3),
-   # mainPanel("main panel",
-#              column(6,plotOutput(outputId="plot1", width="500px",height="400px"),width = 10)
-              
-    mainPanel("main panel",
-              column(6,plotOutput(outputId="plot1", width="1000px",height="400px"))
-    )
-    
-    # Show a plot of the generated distribution
-    #   mainPanel(
-    #  plotOutput("distPlot")
-    #    plotOutput("plot1")
-    #tableOutput("table1")
-        )
-  )
 
+    #mainPanel("main panel",
+   #           column(6,plotOutput(outputId="plot1", width="1000px",height="400px"))
+  #  )))
+#mainPanel("main panel",
+#          column(6,plotOutput(outputId="plot1", width="1000px",height="400px"),uiOutput("lm1"))
+#)))
+#make it conditional on input type
+#need seperate plot labels to make conditional work (R doesnt like two thing with the same name)
+mainPanel(
+  conditionalPanel(
+    "input.analysis=='Site analysis'",
+    column(6,plotOutput(outputId="plot1", width="1000px",height="400px"),uiOutput("lm1"))
+  ),
+  conditionalPanel(
+    "input.analysis=='Site statistics'",
+    column(6,plotOutput(outputId="plot2", width="1000px",height="400px"))
+  )
+   )))
+
+#that means I can probably modify how I display the plots ~ but maybe not as innext will have a dependency in it to skip if its not enough samples

@@ -27,6 +27,9 @@ library('ggplot2')
 library('microbiome')
 library('gridExtra')
 library('ranacapa')
+library('stargazer')
+#think use stargazer to render the beta diversity table
+#https://groups.google.com/g/shiny-discuss/c/3VYuD6gjdk4?pli=1
 
 #input into phyloseq
 setwd("~/Dropbox (Personal)/Otago_2023 (1)/BiomeGene/extremeweatherevents/ASV_files/OneDrive_1_7-05-2024/")
@@ -225,7 +228,7 @@ for (category in categories) {
     #relevel other to end
     data_fish_top10$top10 <- forcats::fct_relevel(data_fish_top10$top10, "Other", after = Inf)
     pbar<-ggplot(data_fish_top10, aes(fill=top10, y=Abundance, x=CollectionDate)) + 
-      geom_bar(position="stack", stat="identity")+ scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title=paste("Top 10",input$level)))+theme_bw()+ theme(axis.text.x = element_text(size = 7, angle = 90, vjust = 0.5, hjust=1)) + theme(legend.title = element_text(size = 8),legend.text = element_text(size = 7)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Read Abundance")
+      geom_bar(position="stack", stat="identity")+ scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title=paste("Top 10",input$level)))+theme_bw()+ theme(axis.text.x = element_text(size = 7, angle = 90, vjust = 0.5, hjust=1)) + theme(legend.title = element_text(size = 8),legend.text = element_text(size = 7)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Read Abundance")+ labs(x = "Sample")
     
    # +theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Read Abundance")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
     pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
@@ -293,7 +296,34 @@ for (category in categories) {
     pbar
     })
   
-  output$plot1 = renderPlot({
+mod <- reactive({
+    print('test')
+    if (input$analysis == "Site statistics") { 
+      return(NULL)}
+    if (input$analysis == "Site analysis") {
+      phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa')
+      phyloseq_object_prune.pa.OTU <- as(otu_table(phyloseq_object_prune.pa), "matrix")
+      phyloseq_object_prune.pa_OTU_df = as.data.frame(phyloseq_object_prune.pa.OTU)
+      phyloseq_object_prune.pa_OTU_df= t(phyloseq_object_prune.pa_OTU_df)
+      phyloseq_object_prune.pa_Sample = as(sample_data(phyloseq_object_prune.pa), "matrix")
+      phyloseq_object_prune.pa_Sample_df =  as.data.frame(phyloseq_object_prune.pa_Sample)
+      OTU_Dist <- vegdist(phyloseq_object_prune.pa_OTU_df, method="jaccard")
+      mod_beta<-adonis2(OTU_Dist ~ CollectionDate, method = "jaccard", data = phyloseq_object_prune.pa_Sample_df, permutations = 9999)
+      print(mod_beta)
+      print(OTU_Dist)
+    }
+    mod_beta
+  })
+
+# print(pt5)
+#?stargazer
+output$lm1 <- renderText(HTML(stargazer(mod(), type="html",title="PERMOVA OTU distance matrix ~ Samples")))  
+#output$modelSummary <- renderPrint({
+#  mod()
+#})
+
+#cause its now conditional on the table I need to have seperate plot labels for the UI side
+output$plot1 = renderPlot({
     ptlist <- list(pt1(),pt2(),pt3(),pt4())
     # remove the null plots from ptlist and wtlist
     to_delete <- !sapply(ptlist,is.null)
@@ -301,6 +331,13 @@ for (category in categories) {
     if (length(ptlist)==0) return(NULL)
     grid.arrange(grobs=ptlist,ncol=length(ptlist))
   })
-  
+  output$plot2 = renderPlot({
+    ptlist <- list(pt1(),pt2(),pt3(),pt4())
+    # remove the null plots from ptlist and wtlist
+    to_delete <- !sapply(ptlist,is.null)
+    ptlist <- ptlist[to_delete] 
+    if (length(ptlist)==0) return(NULL)
+    grid.arrange(grobs=ptlist,ncol=length(ptlist))
+  })
 }
 

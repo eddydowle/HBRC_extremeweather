@@ -655,6 +655,19 @@ taxa_table_clean %>% filter(row.names(taxa_table_clean) %in% "1512276")
 #alright definitly going to have to filter some of this out. Could try:
 #1- only analysing insecta
 #2- only analysing true freshwater groups
+#pernova in app
+phyloseq_object_prune.pa <- microbiome::transform(FisheDNA, 'pa')
+phyloseq_object_prune.pa.OTU <- as(otu_table(phyloseq_object_prune.pa), "matrix")
+phyloseq_object_prune.pa_OTU_df = as.data.frame(phyloseq_object_prune.pa.OTU)
+phyloseq_object_prune.pa_OTU_df= t(phyloseq_object_prune.pa_OTU_df)
+phyloseq_object_prune.pa_Sample = as(sample_data(phyloseq_object_prune.pa), "matrix")
+phyloseq_object_prune.pa_Sample_df =  as.data.frame(phyloseq_object_prune.pa_Sample)
+OTU_Dist <- vegdist(phyloseq_object_prune.pa_OTU_df, method="jaccard")
+mod_beta<-adonis2(OTU_Dist ~ location_date, method = "jaccard", data = phyloseq_object_prune.pa_Sample_df, permutations = 9999)
+print(mod_beta)
+print(OTU_Dist)
+
+stargazer(mod_beta)
 
 ########################
 #JUST FRESHWATER GROUPS#

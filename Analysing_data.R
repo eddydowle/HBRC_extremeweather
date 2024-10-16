@@ -788,6 +788,23 @@ otu <- otu_table(otu_table_freshwater_splitout_CI_wide, taxa_are_rows = TRUE)
 taxa <- tax_table(tax_mat)
 sample <- sample_data(meta_data_clean)
 
+#add the seasonality to the map meta_data
+meta_data<-read.table('Wilderlab_meta_out.txt',sep='\t',quote='',header =T)
+
+
+
+test<-meta_data %>% mutate(Date = as.Date(CollectionDate, format= "%d/%m/%y")) %>% mutate(season=case_when(Date>='2019-07-01' & Date<='2020-06-30' ~'2019-2020',Date>='2020-07-01' & Date<='2021-06-30' ~'2020-2021',Date>='2021-07-01' & Date<='2022-06-30' ~'2021-2022', Date>='2022-07-01' & Date<='2023-06-30' ~'2022-2023', Date>='2023-07-01' & Date<='2024-06-30' ~'2023-2024'))
+
+unique(test$season)
+#another column pre and post cyclone
+test %>% select(CollectionDate,Cyclone,season) %>% unique()
+#Cyclone column is correct in pre/post
+#all 2022-2023 are post cyclone so to compare first year impact to second year impact can do: 2022-2023 vs 2023-2024
+write.table(test,'Wilderlab_meta_out_season.txt',sep='\t',row.names=F)
+test<-read.table('Wilderlab_meta_out_season.txt',sep='\t',header =T)
+
+
+
 #should go into phyloseq now
 
 ###############

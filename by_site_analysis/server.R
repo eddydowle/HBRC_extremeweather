@@ -37,7 +37,8 @@ samples<-read.csv('HBRC_samples_Eddy.csv')
 records<-read.csv('HBRC_records_Eddy.csv')
 #just cutting down to make it lighter for testing
 #records<-read.csv('HBRC_records_Eddy_random50k.csv')
-meta_data<-read.table('Wilderlab_meta_out.txt',sep='\t',quote='',header =T)
+#meta_data<-read.table('Wilderlab_meta_out.txt',sep='\t',quote='',header =T)
+meta_data<-read.table('Wilderlab_meta_out_clean.txt',sep='\t',quote='',header =T)
 otu_table <- records %>% select(UID, PrimerSet, Count, TaxID)
 #write.csv(otu_table,'HBRC_records_Eddy_random50k_otuapp.csv',row.names=F)
 #write.csv(taxa_table,'HBRC_records_Eddy_random50k_taxaapp.csv',row.names=F)
@@ -54,6 +55,7 @@ function(input, output, session) {
   otu_table_subset<- reactive({
     otu_table_filtered<-otu_table %>% filter(PrimerSet == input$assay) %>% select(-PrimerSet) 
     if (input$subset_data_CI == "Just freshwater" | input$subset_data_RV == "Just freshwater" |input$subset_data_WV == "Just freshwater" ) {
+      print('just freshwater')
       family<-freshwater_taxa %>% filter(Rank == 'Family')
       genus<-freshwater_taxa %>% filter(Rank == 'Genus')
       phylum<-freshwater_taxa %>% filter(Rank == 'Phylum')
@@ -79,6 +81,7 @@ function(input, output, session) {
     meta_data_cl <-meta_data_2 %>% filter(UID %in% otu_table_subset()$UID)
     row.names(meta_data_cl) <- meta_data_cl$UID
     meta_data_cl[1] <- NULL
+    #print(meta_data_cl)
     return(meta_data_cl)
   })
   #taxa table for phyloseq
@@ -112,42 +115,66 @@ function(input, output, session) {
     test<-meta_data_clean()[order(as.Date(meta_data_clean()$CollectionDate, format="%d/%m/%Y")),]
     test_names<-row.names(test)
     FisheDNA<-phyloseq(otu, taxa, sample)
-    FisheDNA<-ps_reorder(FisheDNA, test_names)
-    #remove singletons
-    FisheDNA.5 <- filter_taxa(FisheDNA, function(x){sum(x > 0) > 1}, prune=TRUE)          
-    #to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice) %>% pull(sample_id)
-  #  FisheDNA.5<-prune_samples(to_prune,FisheDNA.5)
+    #FisheDNA<-ps_reorder(FisheDNA, test_names)
+    FisheDNA.5<-ps_reorder(FisheDNA, test_names)
+    #remove singletons (moving this down to after other filters)
+#    FisheDNA.5 <- filter_taxa(FisheDNA, function(x){sum(x > 0) > 1}, prune=TRUE)          
     to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice) %>% pull(sample_id)
     FisheDNA.5<-prune_samples(to_prune,FisheDNA.5)
+    #filter those with less than 5 replicates
+    #this is important when the taxa filters come on as it causes some samples to drop out if there is no target taxa ~ which means some samples will drop between taxa filters but this seems the best way around it. 
+    filter<-as.data.frame(sample_data(FisheDNA.5)) %>% group_by(CollectionDate) %>% summarise(count=n()) %>% filter(count >=5) 
+    remove_idx_test = as.character(get_variable(FisheDNA.5, "CollectionDate")) %in% filter$CollectionDate   
+ #   print(remove_idx_test)
+    FisheDNA.5 <- prune_samples(remove_idx_test, FisheDNA.5)
+    #remove singletons
+    FisheDNA.5 <- filter_taxa(FisheDNA.5, function(x){sum(x > 0) > 1}, prune=TRUE)          
+    #for whatever reason subset_samples doesnt work in shinny so have to use the prune samples work around
+        #FisheDNA.test<-subset_samples(FisheDNA.5, CollectionDate %in% filter$CollectionDate)
+    #print(sample_names(FisheDNA.5))
+   # print(otu_table(FisheDNA.5))
     return(FisheDNA.5)
   })
   #then should be able to build plots from phyloseq_object
+
+#im probably going to have to put a minimum taxa count on that switches innext on or off as it seems to bug out when there is <5ish taxa?
   
 #generate a innext object
-  
+#if we skip when there is <5 samples passing filter...then would need to fix the colours later on
   inext_object<-reactive({
+    if (nrow(otu_table(phyloseq_object())) < 10) {
+      return(NULL)
+    }
+    else {
     phyloseq.pa <- microbiome::transform(phyloseq_object(), 'pa')
-  categories <- unique(sample_data(phyloseq.pa)$CollectionDate)
+   # print(otu_table(phyloseq_object()))
+    print(nrow(otu_table(phyloseq_object())))
+   categories <- unique(sample_data(phyloseq.pa)$CollectionDate)
   split_physeq_list <- list()
   print(categories)
+  #subselected_categories<-NULL
 for (category in categories) {
-    print(category)
+  #  print(category)
     remove_idx = as.character(get_variable(phyloseq.pa, "CollectionDate")) == category
     sub_physeq.100 <- prune_samples(remove_idx, phyloseq.pa)
-    split_physeq_list[[category]] <- otu_table(sub_physeq.100)}
+ #   print(otu_table(sub_physeq.100))
+    split_physeq_list[[category]] <- otu_table(sub_physeq.100)
+}
   matrix_list <- lapply(split_physeq_list, function(x) {
     otu_table <- as(x, "matrix")
     return(otu_table)
   })
+  
   matrix_list<-NULL
   matrix_list <- list(data = list())
   for (category in categories) {
     otu_table <- as(otu_table(split_physeq_list[[category]]), "matrix")
     matrix_list[["data"]][[category]] <- otu_table
   }
-#  print(matrix_list)
+ # print(matrix_list$data)
   out.raw <- iNEXT3D(data = matrix_list$data, diversity = 'TD', q = c(0, 1, 2), datatype = 'incidence_raw', nboot = 50)
-  return(out.raw)
+  print('endinnext')
+  return(out.raw)}
   #type 1 for site stats
  #ggiNEXT3D(out.raw, type = 1, facet.var = 'Assemblage') + facet_wrap(~Assemblage, nrow = 3)
 #  ggiNEXT3D(out.raw, type = 1, facet.var = "Order.q")
@@ -171,11 +198,16 @@ for (category in categories) {
       theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.5, hjust=1),axis.text.y = element_text(size = 8),axis.title=element_text(size=11)) 
       p$data$CollectionDate <- factor(p$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(p$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
-    p
+    return(p)
   })
   pt2 <- reactive({
     if (input$analysis == "Site statistics") 
     {
+      if (is.null(inext_object())){
+        print('isnull')
+        pbar<-NULL
+      }
+      else{
      pbar<- ggiNEXT3D(inext_object(), type = 2, facet.var = "Order.q", color.var = "Assemblage")
      #this does not solve all the issues for some reason I cant change the factor of the shape but can the colour so shifting the colour over to ordered and just turning of the shape legend. 
      pbar$data$col <- factor(pbar$data$col, levels = str_remove(format(sort(as.Date(unique(pbar$data$shape), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
@@ -193,7 +225,9 @@ for (category in categories) {
      n = length(unique(pbar$data$shape))
      cols = gg_color_hue(n)
      pbar<-pbar+scale_color_manual(values = cols)+scale_fill_manual(values = cols)
-         }
+      }
+    }
+
     if (input$analysis == "Site analysis") 
     {    
       phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa') #pa dataset
@@ -208,7 +242,7 @@ for (category in categories) {
       #+theme(axis.text=element_text(size=4),axis.title=element_text(size=12))
      pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
-    pbar
+    return(pbar)
       })
   pt3 <- reactive({
     if (input$analysis == "Site statistics") {    
@@ -233,8 +267,13 @@ for (category in categories) {
    # +theme(legend.title = element_text(size = 8),legend.text = element_text(size = 6)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Read Abundance")+ theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
     pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
-    if (input$analysis == "Site analysis") 
-    {
+    
+    if (input$analysis == "Site analysis") {
+      if (is.null(inext_object())){
+        print('isnull')
+        pbar<-NULL
+      }
+      else{
     #  pbar<- ggiNEXT3D(inext_object(), type = 1, facet.var = 'Assemblage') + facet_wrap(~Assemblage, nrow = 3)
       pbar<- ggiNEXT3D(inext_object(), type = 1, facet.var = "Order.q")
       #this does not solve all the issues for some reason I cant change the factor of the shape but can the colour so shifting the colour over to ordered and just turning of the shape legend. 
@@ -257,8 +296,10 @@ for (category in categories) {
       cols = gg_color_hue(n)
       pbar<-pbar+scale_color_manual(values = cols)+scale_fill_manual(values = cols)
       }
-    pbar
-    })
+   #   return(pbar)
+    }
+    return(pbar)
+     })
   
   pt4 <- reactive({
     if (input$analysis == "Site statistics") { return(NULL)}
@@ -293,11 +334,11 @@ for (category in categories) {
         #theme(axis.text=element_text(size=4),axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),axis.title=element_text(size=10,face="bold"))
  pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
     }
-    pbar
+    return(pbar)
     })
   
 mod <- reactive({
-    print('test')
+ #   print('test')
     if (input$analysis == "Site statistics") { 
       return(NULL)}
     if (input$analysis == "Site analysis") {
@@ -309,10 +350,10 @@ mod <- reactive({
       phyloseq_object_prune.pa_Sample_df =  as.data.frame(phyloseq_object_prune.pa_Sample)
       OTU_Dist <- vegdist(phyloseq_object_prune.pa_OTU_df, method="jaccard")
       mod_beta<-adonis2(OTU_Dist ~ CollectionDate, method = "jaccard", data = phyloseq_object_prune.pa_Sample_df, permutations = 9999)
-      print(mod_beta)
-      print(OTU_Dist)
+#      print(mod_beta)
+ #     print(OTU_Dist)
     }
-    mod_beta
+    return(mod_beta)
   })
 
 # print(pt5)

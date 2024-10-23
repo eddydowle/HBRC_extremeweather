@@ -40,6 +40,8 @@ out_table_MZ<- otu_table_splitout$CI %>% select(-PrimerSet) %>% group_by(UID, Ta
 
 #switching to CI which is insect
 out_table_MZ<- otu_table_splitout$CI %>% select(-PrimerSet) %>% group_by(UID, TaxID)
+#switching to RV which has issues in app
+out_table_MZ<- otu_table_splitout$RV %>% select(-PrimerSet) %>% group_by(UID, TaxID)
 
 #count unique samples (no idea why dplyr thinks it grouped)
 out_table_MZ %>% ungroup() %>% select(UID) %>% n_distinct()
@@ -157,6 +159,12 @@ sample <- sample_data(meta_data_clean)
 
 #filtering out a couple of random sites
 meta_data_cut <- meta_data %>% filter( grepl('Esk Rvr at Berry Rd', HBRC_Site_Name))
+#weird sites acting out
+meta_data_cut <- meta_data %>% filter( grepl('Wharerangi US Ahuriri Estuary', HBRC_Site_Name))
+meta_data_cut <- meta_data %>% filter( grepl('Awanui Strm at Flume', HBRC_Site_Name))
+meta_data_cut <- meta_data %>% filter( grepl('Aropaoanui at Aropaoanui', HBRC_Site_Name))
+
+
 #othero one is Esk Rvr at Waipunga Br
 out_table_MZ_cut <- out_table_MZ %>% filter(UID %in% meta_data_cut$UID)
 #reverse in case there is one missing the other way for this marker
@@ -197,6 +205,22 @@ sample <- sample_data(meta_data_cut_clean)
 #some of this wont work on all sites and some wont work on cutdown just fucking about
 FisheDNA<-phyloseq(otu, taxa, sample)
 sample_data(FisheDNA)
+filter<-as.data.frame(sample_data(FisheDNA)) %>% group_by(CollectionDate) %>% summarise(count=n()) %>% filter(count >=5) 
+test<-ps_filter(FisheDNA,CollectionDate != "16/11/23")
+sample_names(FisheDNA)
+otu_table(FisheDNA)
+FisheDNA
+subset_samples(FisheDNA, CollectionDate == "16/11/23")
+#this:
+subset_samples(FisheDNA, CollectionDate %in% filter$CollectionDate)
+
+
+data("enterotype", package = "phyloseq")
+enterotype
+sample_data(enterotype)
+ps1 <- ps_filter(enterotype, SeqTech != "Sanger")
+ps1
+
 test<-meta_data_clean %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name=='Esk Rvr at Berry Rd') %>% pull(sample_id)
 testphyloseq<-prune_samples(test,FisheDNA)
 #order samples by date
@@ -221,6 +245,7 @@ FisheDNA.5 <- filter_taxa(FisheDNA, function(x){sum(x > 0) > 1}, prune=TRUE) #re
 FisheDNA.5 #drop from 321 to 250 taxa
 
 FisheDNA.5.fish = subset_taxa(FisheDNA.5, Class=="Actinopteri" |Class=="Cladistia" |Class=='Hyperoartia')
+otu_table(FisheDNA.5.fish)
 #7 fish taxa
 #FisheDNA.5 <-FisheDNA.5.fish
 
@@ -929,3 +954,15 @@ leaflet(year2023_allsites) %>%
   addLegend("bottomright", pal = pal, values = ~present_overtime,
             title = "Presence/absence",
             opacity = 1) 
+
+#######
+#fixing site list for app
+meta_data<-read.table('Wilderlab_meta_out.txt',sep='\t',quote='',header =T)
+actualsites<-read.csv('Site_list_HBRC_Sep2024_justin.csv',header=T)
+unique(meta_data$HBRC_Site_Name)
+sort(unique(meta_data$HBRC_Site_Name))
+#should only be 93
+sites<-actualsites$HBRC_Site_Name
+sites
+meta_data_justsites<-meta_data %>% filter(HBRC_Site_Name %in% sites)
+write.table(meta_data_justsites,'Wilderlab_meta_out_clean.txt',row.names=F,sep='\t',quote=F)

@@ -23,22 +23,26 @@ fluidPage(theme = shinytheme("united"),
     sidebarPanel(
       selectInput("analysis","Select Analysis",choices =c('Site statistics','Site analysis'), selected = 'Site analysis'),
             selectInput("assay", "Select Assay",
-                  choices =c("CI","BE","BU","MZ","RV","TP","UM","WV"), selected='CI'),
+                  choices =c("CI: General Eukaryote","BE: General Eukayote","BU: Mostly insects","MZ: Vascular Plants","RV: Vertebrates","TP: Vascular Plants","UM: Microbe","WV: Vertebrates"), selected='CI'),
       selectInput('site_choice',"Select site", sort(unique(meta_data$HBRC_Site_Name))),
       conditionalPanel(
         "input.analysis=='Site analysis'",
         pickerInput("diversity_measure", "Alpha diversity type", c("Observed", "Chao1",  "Shannon", "Simpson", "InvSimpson"),multiple = F)),
       conditionalPanel(
-        "input.assay=='CI'",
-        pickerInput("subset_data_CI", "Select otu's", c("All","Just freshwater"),multiple = F,selected='All'))
-      ,
+        "input.assay=='BE: General Eukayote'|input.assay=='BU: Mostly insects'|input.assay=='MZ: Vascular Plants'|input.assay=='TP: Vascular Plants'|input.assay=='UM: Microbe'",
+        pickerInput('subset_data_rest', "Select otu's",'All',multiple=F
+      )),
       conditionalPanel(
-        "input.assay=='RV'",
-        pickerInput("subset_data_RV", "Select otu's", c("All","Just freshwater"),multiple = F,selected='All'))
+        "input.assay=='CI: General Eukaryote'|input.assay=='RV: Vertebrates'|input.assay=='WV: Vertebrates'",
+        pickerInput("subset_data_freshwater", "Select otu's", c("All","Just freshwater"),multiple = F))
       ,
-      conditionalPanel(
-        "input.assay=='WV'",
-        pickerInput("subset_data_WV", "Select otu's", c("All","Just freshwater"),multiple = F,selected='All')),
+    #  conditionalPanel(
+    #    "input.assay=='RV'",
+     #   pickerInput("subset_data_RV", "Select otu's", c("All","Just freshwater"),multiple = F,selected='All'))
+      #,
+      #conditionalPanel(
+      #  "input.assay=='WV'",
+      #  pickerInput("subset_data_WV", "Select otu's", c("All","Just freshwater"),multiple = F,selected='All')),
       selectInput("level", "Select classification level (barchart colours only)",
                   choices =c("Class","Genus"), selected='CI')
     ,width = 3),
@@ -54,11 +58,13 @@ fluidPage(theme = shinytheme("united"),
 mainPanel(
   conditionalPanel(
     "input.analysis=='Site analysis'",
-    column(6,plotOutput(outputId="plot1", width="1000px",height="400px"),uiOutput("lm1"))
+    column(6,plotOutput(outputId="plot1", width="700px",height="400px"),uiOutput("lm1"))
+#    column(6,plotOutput(outputId="plot1"),uiOutput("lm1"))
   ),
   conditionalPanel(
     "input.analysis=='Site statistics'",
-    column(6,plotOutput(outputId="plot2", width="1000px",height="400px"))
+    column(6,plotOutput(outputId="plot2", width="700px",height="400px"))
+  #  column(6,plotOutput(outputId="plot2"))
   )
    )))
 

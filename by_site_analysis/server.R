@@ -51,11 +51,26 @@ freshwater_taxa<-read.table('freshwater_invertsfish.txt',header=T,row.names=NULL
 # Define server logic required to draw a histogram
 function(input, output, session) {
   
+specieslist<-reactiveValues()
+specieslist$result<-NULL
+
+observeEvent(c(input$site_choice,input$assay,input$subset_data_freshwater,input$subset_data_rest),{
+   if (input$subset_data_freshwater=="Just freshwater"  & input$assay=='CI: General Eukaryote' | input$subset_data_freshwater=="Just freshwater"  & input$assay=='RV: Vertebrates' | input$subset_data_freshwater=="Just freshwater"  & input$assay=='WV: Vertebrates'){
+    specieslist$result<-'freshwater'
+  }  else {
+    specieslist$result<-'all'
+  }
+    print(specieslist$result)  
+})
+  
   #filtered otu table
   otu_table_subset<- reactive({
-    otu_table_filtered<-otu_table %>% filter(PrimerSet == input$assay) %>% select(-PrimerSet) 
-    if (input$subset_data_CI == "Just freshwater" | input$subset_data_RV == "Just freshwater" |input$subset_data_WV == "Just freshwater" ) {
-      print('just freshwater')
+    otu_table_filtered<-otu_table %>% filter(PrimerSet == sub(":.*", "",input$assay)) %>% select(-PrimerSet) 
+ #   print(otu_table_filtered)
+ #   otu_table_filtered<-otu_table %>% filter(PrimerSet == input$assay) %>% select(-PrimerSet) 
+#    if (input$subset_data_CI == "Just freshwater" | input$subset_data_RV == "Just freshwater" |input$subset_data_WV == "Just freshwater" ) {
+ if (specieslist$result == 'freshwater') {
+         print('just freshwater')
       family<-freshwater_taxa %>% filter(Rank == 'Family')
       genus<-freshwater_taxa %>% filter(Rank == 'Genus')
       phylum<-freshwater_taxa %>% filter(Rank == 'Phylum')
@@ -109,30 +124,37 @@ function(input, output, session) {
   #make a phyloseq object and create figure to see if that is the issue
   
   phyloseq_object<-reactive({
+    print('phyloseq_object')
     otu <- otu_table(otu_table_wide_clean_phyloseq(), taxa_are_rows = TRUE) 
     taxa <- tax_table(taxa_table_clean_phyloseq())
     sample <- sample_data(meta_data_clean())
     test<-meta_data_clean()[order(as.Date(meta_data_clean()$CollectionDate, format="%d/%m/%Y")),]
     test_names<-row.names(test)
     FisheDNA<-phyloseq(otu, taxa, sample)
+   # print(sample_data(FisheDNA))
     #FisheDNA<-ps_reorder(FisheDNA, test_names)
     FisheDNA.5<-ps_reorder(FisheDNA, test_names)
     #remove singletons (moving this down to after other filters)
 #    FisheDNA.5 <- filter_taxa(FisheDNA, function(x){sum(x > 0) > 1}, prune=TRUE)          
     to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice) %>% pull(sample_id)
+   # print(to_prune)
     FisheDNA.5<-prune_samples(to_prune,FisheDNA.5)
+   # print(FisheDNA.5)
     #filter those with less than 5 replicates
     #this is important when the taxa filters come on as it causes some samples to drop out if there is no target taxa ~ which means some samples will drop between taxa filters but this seems the best way around it. 
     filter<-as.data.frame(sample_data(FisheDNA.5)) %>% group_by(CollectionDate) %>% summarise(count=n()) %>% filter(count >=5) 
     remove_idx_test = as.character(get_variable(FisheDNA.5, "CollectionDate")) %in% filter$CollectionDate   
  #   print(remove_idx_test)
-    FisheDNA.5 <- prune_samples(remove_idx_test, FisheDNA.5)
+    #this line Im commenting out but will remove the less than 5 taxa, might not need now inext has the error catch?
+#    FisheDNA.5 <- prune_samples(remove_idx_test, FisheDNA.5)
+  #  print(sample_data(FisheDNA.5))
     #remove singletons
     FisheDNA.5 <- filter_taxa(FisheDNA.5, function(x){sum(x > 0) > 1}, prune=TRUE)          
     #for whatever reason subset_samples doesnt work in shinny so have to use the prune samples work around
         #FisheDNA.test<-subset_samples(FisheDNA.5, CollectionDate %in% filter$CollectionDate)
     #print(sample_names(FisheDNA.5))
-   # print(otu_table(FisheDNA.5))
+    FisheDNA.5 <- prune_samples(sample_sums(FisheDNA.5) >= 1, FisheDNA.5)
+ #   print(otu_table(FisheDNA.5))
     return(FisheDNA.5)
   })
   #then should be able to build plots from phyloseq_object
@@ -143,6 +165,7 @@ function(input, output, session) {
 #if we skip when there is <5 samples passing filter...then would need to fix the colours later on
   inext_object<-reactive({
     if (nrow(otu_table(phyloseq_object())) < 10) {
+      print('lessthan10taxa')
       return(NULL)
     }
     else {
@@ -151,7 +174,7 @@ function(input, output, session) {
     print(nrow(otu_table(phyloseq_object())))
    categories <- unique(sample_data(phyloseq.pa)$CollectionDate)
   split_physeq_list <- list()
-  print(categories)
+ # print(categories)
   #subselected_categories<-NULL
 for (category in categories) {
   #  print(category)
@@ -171,10 +194,22 @@ for (category in categories) {
     otu_table <- as(otu_table(split_physeq_list[[category]]), "matrix")
     matrix_list[["data"]][[category]] <- otu_table
   }
- # print(matrix_list$data)
-  out.raw <- iNEXT3D(data = matrix_list$data, diversity = 'TD', q = c(0, 1, 2), datatype = 'incidence_raw', nboot = 50)
-  print('endinnext')
-  return(out.raw)}
+#this works but adding a try catch
+  #out.raw <- iNEXT3D(data = matrix_list$data, diversity = 'TD', q = c(0, 1, 2), datatype = 'incidence_raw', nboot = 50)
+#catch if innext errors will return null and innext wont plot
+    tryCatch({
+    out.raw <- iNEXT3D(data = matrix_list$data, diversity = 'TD', q = c(0, 1, 2), datatype = 'incidence_raw', nboot = 50)
+    print('innextsuccess')
+    return(out.raw)
+    }, error = function(e) {
+      out.raw<-NULL
+      print('innexterrored')
+    return(NULL)
+    },silent=TRUE)
+  #print('endinnext')
+  #return(out.raw)
+  }
+    
   #type 1 for site stats
  #ggiNEXT3D(out.raw, type = 1, facet.var = 'Assemblage') + facet_wrap(~Assemblage, nrow = 3)
 #  ggiNEXT3D(out.raw, type = 1, facet.var = "Order.q")
@@ -358,27 +393,30 @@ mod <- reactive({
 
 # print(pt5)
 #?stargazer
-output$lm1 <- renderText(HTML(stargazer(mod(), type="html",title="PERMOVA OTU distance matrix ~ Samples")))  
+output$lm1 <- renderText(HTML(stargazer(mod(), type="html",title="PERMOVA: ASV distance matrix ~ Sampling Date")))  
 #output$modelSummary <- renderPrint({
 #  mod()
 #})
 
 #cause its now conditional on the table I need to have seperate plot labels for the UI side
 output$plot1 = renderPlot({
-    ptlist <- list(pt1(),pt2(),pt3(),pt4())
+    ptlist <- list(pt4(),pt1(),pt2(),pt3())
     # remove the null plots from ptlist and wtlist
     to_delete <- !sapply(ptlist,is.null)
     ptlist <- ptlist[to_delete] 
     if (length(ptlist)==0) return(NULL)
-    grid.arrange(grobs=ptlist,ncol=length(ptlist))
+#    grid.arrange(grobs=ptlist,ncol=length(ptlist))
+    grid.arrange(grobs=ptlist,ncol=2)
   })
   output$plot2 = renderPlot({
-    ptlist <- list(pt1(),pt2(),pt3(),pt4())
+    ptlist <- list(pt3(),pt1(),pt2(),pt4())
     # remove the null plots from ptlist and wtlist
     to_delete <- !sapply(ptlist,is.null)
     ptlist <- ptlist[to_delete] 
     if (length(ptlist)==0) return(NULL)
-    grid.arrange(grobs=ptlist,ncol=length(ptlist))
+ #   grid.arrange(grobs=ptlist,ncol=length(ptlist))
+    grid.arrange(grobs=ptlist,ncol=2)
+    
   })
 }
 

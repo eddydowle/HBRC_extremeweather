@@ -243,7 +243,8 @@ taxa_names(FisheDNA)[1:10]
 
 FisheDNA.5 <- filter_taxa(FisheDNA, function(x){sum(x > 0) > 1}, prune=TRUE) #removing singletons
 FisheDNA.5 #drop from 321 to 250 taxa
-
+sample_names(FisheDNA.5)[1:5]
+test_names
 FisheDNA.5.fish = subset_taxa(FisheDNA.5, Class=="Actinopteri" |Class=="Cladistia" |Class=='Hyperoartia')
 otu_table(FisheDNA.5.fish)
 #7 fish taxa
@@ -253,17 +254,26 @@ Fish.eDNA.pa <- microbiome::transform(FisheDNA.5, 'pa') #pa dataset
 library(RColorBrewer)
 mycolors = c(brewer.pal(name="Dark2", n = 8), brewer.pal(name="Paired", n = 6))
 ?plot_bar
-p = plot_bar(FisheDNA.5,  fill="Class")
-p + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
+pn <- plot_bar(FisheDNA.5,  fill="Class")
+pn + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
   ggtitle("Read abundance across sample number ") +
   geom_vline(aes(xintercept = 646.5), 
+#  geom_vline(aes(xintercept = 10), 
              linetype = "dashed", colour = "red",size = 1)+
-  theme(legend.key.size = unit(0.05, 'cm'))+
+ # theme(legend.key.size = unit(0.05, 'cm'))+
  theme(legend.position="none")#+
   scale_fill_manual(values = mycolors) + scale_color_manual(values = mycolors)
 
-  p$data
+  pn
+  ptest = plot_bar(FisheDNA.5,  fill="Class") + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Read Abundance") + theme_bw()+  theme(legend.position="none")+geom_vline(aes(xintercept = 646.5), linetype = "dashed", colour = "red",size = 1)
+  ptest = plot_bar(FisheDNA.5,  fill="Class") + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Read Abundance") +   theme(legend.position="none")+geom_vline(aes(xintercept = 646.5), linetype = "dashed", colour = "red",size = 1)
   
+ptest
+
+ptest<-ptest+geom_vline(aes(xintercept = 646.5), 
+           #  geom_vline(aes(xintercept = 10), 
+           linetype = "dashed", colour = "red",size = 1)
+
   ptest = plot_bar(FisheDNA.5, "CollectionDate", fill="Class") + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Read Abundance") + theme_bw()+  theme(legend.position="none")
   ptest
   test_data<-ptest$data
@@ -290,10 +300,10 @@ p + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
   p + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") +
     ggtitle("Presence/Absence across sites") +
     geom_vline(aes(xintercept = 646.5), 
-               linetype = "dashed", colour = "red",size = 1)+
-    theme(legend.key.size = unit(0.05, 'cm'))#+
+               linetype = "dashed", colour = "red",size = 5)+
+    #theme(legend.key.size = unit(0.05, 'cm'))#+
     theme(legend.position="none")
-
+p
 #adding a vertical line to indicate cyclone date 
   #makes a more aesthetic plot
 #such a clunky way to do colours, not sure why I cant set it in main 
@@ -825,7 +835,7 @@ unique(test$season)
 test %>% select(CollectionDate,Cyclone,season) %>% unique()
 #Cyclone column is correct in pre/post
 #all 2022-2023 are post cyclone so to compare first year impact to second year impact can do: 2022-2023 vs 2023-2024
-write.table(test,'Wilderlab_meta_out_season.txt',sep='\t',row.names=F)
+#write.table(test,'Wilderlab_meta_out_season.txt',sep='\t',row.names=F)
 test<-read.table('Wilderlab_meta_out_season.txt',sep='\t',header =T)
 
 

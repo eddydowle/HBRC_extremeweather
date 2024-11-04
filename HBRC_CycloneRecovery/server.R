@@ -29,23 +29,25 @@ library('leaflet')
 setwd("~/Dropbox (Personal)/Otago_2023 (1)/BiomeGene/extremeweatherevents/ASV_files/OneDrive_1_7-05-2024/")
 meta_data_map<-read.table('Wilderlab_meta_map.txt',sep='\t',quote='',header =T)
 
-records<-read.csv('HBRC_records_Eddy.csv')
+#records<-read.csv('HBRC_records_Eddy.csv')
 #bring in meta data
 #meta_data<-read.table('Wilderlab_meta_out.txt',sep='\t',quote='',header =T)
 #modified with additional column for season
-meta_data<-read.table('Wilderlab_meta_out_season.txt',sep='\t',header =T)
+#meta_data<-read.table('Wilderlab_meta_out_season.txt',sep='\t',header =T)
 
-freshwater_invertsfish<-read.table('freshwater_invertsfish.txt',header=T,row.names=NULL,sep='\t')
+#freshwater_invertsfish<-read.table('freshwater_invertsfish.txt',header=T,row.names=NULL,sep='\t')
 #freshwater_invertsfish %>% distinct(Rank) 
-family<-freshwater_invertsfish %>% filter(Rank == 'Family')
-genus<-freshwater_invertsfish %>% filter(Rank == 'Genus')
-phylum<-freshwater_invertsfish %>% filter(Rank == 'Phylum')
-order<-freshwater_invertsfish %>% filter(Rank == 'Order')
-class<-freshwater_invertsfish %>% filter(Rank == 'Class')
+#family<-freshwater_invertsfish %>% filter(Rank == 'Family')
+#genus<-freshwater_invertsfish %>% filter(Rank == 'Genus')
+#phylum<-freshwater_invertsfish %>% filter(Rank == 'Phylum')
+#order<-freshwater_invertsfish %>% filter(Rank == 'Order')
+#class<-freshwater_invertsfish %>% filter(Rank == 'Class')
 
-records_eukaryote_freshwater<-records %>% filter(Phylum %in% phylum$ID | Family %in% family$ID | Genus %in% genus$ID | Order %in% order$ID | Class %in% class$ID)
+#records_eukaryote_freshwater<-records %>% filter(Phylum %in% phylum$ID | Family %in% family$ID | Genus %in% genus$ID | Order %in% order$ID | Class %in% class$ID)
 
-test<-left_join(records_eukaryote_freshwater,meta_data,by='UID')
+#test<-left_join(records_eukaryote_freshwater,meta_data,by='UID')
+#write.table(test,'HBRC_records_Eddy_freshwater_season.txt',sep='\t',quote=F,row.names = F)
+test<-read.table('HBRC_records_Eddy_freshwater_season.txt',header=T,row.names=NULL,sep='\t',quote='')
 
 
 function(input, output, session) {
@@ -59,22 +61,22 @@ function(input, output, session) {
     if (input$integer == '2023-2024') {
       year2021_filtered<-test_filtered_select %>% filter(season=='2023-2024' ) %>% select(HBRC_Site_Name) %>% distinct()
       year2021_all_sites<-test %>% filter(season=='2023-2024' ) %>% select(HBRC_Site_Name) %>% distinct()
-      df<-year2021_all_sites %>% mutate(present = case_when(HBRC_Site_Name %in% year2021_filtered$HBRC_Site_Name~"present_2023-2024",TRUE ~ 'Absent'))
+      df<-year2021_all_sites %>% mutate(present = case_when(HBRC_Site_Name %in% year2021_filtered$HBRC_Site_Name~"Present 2023-2024",TRUE ~ 'Absent'))
      # print(df)
       }
          if (input$integer == '2020-2021') {
            year2022_filtered<-test_filtered_select %>% filter(season=='2020-2021' ) %>% select(HBRC_Site_Name) %>% distinct()
            year2022_all_sites<-test %>% filter(season=='2020-2021' ) %>% select(HBRC_Site_Name) %>% distinct()
-           df<-year2022_all_sites %>% mutate(present = case_when(HBRC_Site_Name %in% year2022_filtered$HBRC_Site_Name~"present_2020-2021",TRUE ~ 'Absent'))
+           df<-year2022_all_sites %>% mutate(present = case_when(HBRC_Site_Name %in% year2022_filtered$HBRC_Site_Name~"Present 2020-2021",TRUE ~ 'Absent'))
          }
          if (input$integer == '2021-2022') {
            year2023_filtered<-test_filtered_select %>% filter(season=='2021-2022' ) %>% select(HBRC_Site_Name) %>% distinct()
            year2023_all_sites<-test %>% filter(season=='2021-2022' ) %>% select(HBRC_Site_Name) %>% distinct()
-           df<-year2023_all_sites %>% mutate(present = case_when(HBRC_Site_Name %in% year2023_filtered$HBRC_Site_Name~"present_2021-2022",TRUE ~ 'Absent'))         }
+           df<-year2023_all_sites %>% mutate(present = case_when(HBRC_Site_Name %in% year2023_filtered$HBRC_Site_Name~"Present 2021-2022",TRUE ~ 'Absent'))         }
          if (input$integer == '2022-2023') {
            year2024_filtered<-test_filtered_select %>% filter(season=='2022-2023' ) %>% select(HBRC_Site_Name) %>% distinct()
            year2024_all_sites<-test %>% filter(season=='2022-2023' ) %>% select(HBRC_Site_Name) %>% distinct()
-           df<-year2024_all_sites %>% mutate(present = case_when(HBRC_Site_Name %in% year2024_filtered$HBRC_Site_Name~"present_2022-2023",TRUE ~ 'Absent'))         
+           df<-year2024_all_sites %>% mutate(present = case_when(HBRC_Site_Name %in% year2024_filtered$HBRC_Site_Name~"Present 2022-2023",TRUE ~ 'Absent'))         
            }
     if (input$integer == "Pre-cyclone (2019 to March 2023) vs Post-cyclone (March 2023 to 2024)") {
       pre_filtered<-test_filtered_select %>% filter(Cyclone=='Pre' ) %>% select(HBRC_Site_Name) %>% distinct()
@@ -85,8 +87,8 @@ function(input, output, session) {
     post_df<-post_all_sites %>% mutate(present_post = case_when(HBRC_Site_Name %in% post_filtered$HBRC_Site_Name~"present_post",TRUE ~ 'absent_post'))
     df<-full_join(pre_df,post_df,by='HBRC_Site_Name')
     df<-df %>% mutate(present = case_when(
-      (present_pre == 'absent_pre' & present_post == 'absent_post') ~ 'Absent_pre&post',
-      (present_pre == 'present_pre' & present_post == 'present_post') ~ 'Present_pre&post',
+      (present_pre == 'absent_pre' & present_post == 'absent_post') ~ 'Absent pre & post',
+      (present_pre == 'present_pre' & present_post == 'present_post') ~ 'Present pre & post',
       (present_pre == 'present_pre' & present_post == 'absent_post') ~ 'Loss post-cyclone',
       (present_pre == 'absent_pre' & present_post == 'present_post') ~ 'Gain post-cyclone', TRUE ~ NA_character_
     ))
@@ -103,8 +105,8 @@ function(input, output, session) {
       post_df<-all_sites_2023 %>% mutate(present_post = case_when(HBRC_Site_Name %in% filtered_2023$HBRC_Site_Name~"present_post-cyclone",TRUE ~ 'absent_post-cyclone'))
       df<-full_join(pre_df,post_df,by='HBRC_Site_Name')
       df<-df %>% mutate(present = case_when(
-        (present_pre == 'absent_pre-cyclone' & present_post == 'absent_post-cyclone') ~ 'Absent_pre&post',
-        (present_pre == 'present_pre-cyclone' & present_post == 'present_post-cyclone') ~ 'Present_pre&post',
+        (present_pre == 'absent_pre-cyclone' & present_post == 'absent_post-cyclone') ~ 'Absent pre & post',
+        (present_pre == 'present_pre-cyclone' & present_post == 'present_post-cyclone') ~ 'Present pre & post',
         (present_pre == 'present_pre-cyclone' & present_post == 'absent_post-cyclone') ~ 'Loss post-cyclone',
         (present_pre == 'absent_pre-cyclone' & present_post == 'present_post-cyclone') ~ 'Gain post-cyclone', TRUE ~ NA_character_
       ))
@@ -121,8 +123,8 @@ function(input, output, session) {
       post_df<-all_sites_2024 %>% mutate(present_post = case_when(HBRC_Site_Name %in% filtered_2024$HBRC_Site_Name~"present_2024",TRUE ~ 'absent_2024'))
       df<-full_join(pre_df,post_df,by='HBRC_Site_Name')
       df<-df %>% mutate(present = case_when(
-        (present_pre == 'absent_2023' & present_post == 'absent_2024') ~ 'Absent_2023&2024',
-        (present_pre == 'present_2023' & present_post == 'present_2024') ~ 'Present_2023&2024',
+        (present_pre == 'absent_2023' & present_post == 'absent_2024') ~ 'Absent 2023 & 2024',
+        (present_pre == 'present_2023' & present_post == 'present_2024') ~ 'Present 2023 & 2024',
         (present_pre == 'present_2023' & present_post == 'absent_2024') ~ 'Loss 2024',
         (present_pre == 'absent_2023' & present_post == 'present_2024') ~ 'Gain 2024', TRUE ~ NA_character_
       ))
@@ -132,7 +134,7 @@ function(input, output, session) {
     
    # print(df)
     #set colours for map
-    df<-df %>% mutate(colour=case_when(present == 'Absent' ~ 'grey',present == 'present_2023-2024' ~ 'steelblue', present=='present_2020-2021' ~'steelblue', present=='present_2021-2022'~ 'steelblue', present=='present_2022-2023'~'steelblue',present=='Absent_pre&post'~'grey',present=='Present_pre&post' ~'steelblue',present=='Loss post-cyclone'~'tomato',present=='Gain post-cyclone'~"limegreen",present=='Absent_2023&2024'~'grey',present=='Present_2023&2024'~'steelblue',present=='Loss 2024'~'tomato',present=='Gain 2024'~'limegreen'))
+    df<-df %>% mutate(colour=case_when(present == 'Absent' ~ 'grey',present == 'Present 2023-2024' ~ 'steelblue', present=='Present 2020-2021' ~'steelblue', present=='Present 2021-2022'~ 'steelblue', present=='Present 2022-2023'~'steelblue',present=='Absent pre & post'~'grey',present=='Present pre & post' ~'steelblue',present=='Loss post-cyclone'~'tomato',present=='Gain post-cyclone'~"limegreen",present=='Absent 2023 & 2024'~'grey',present=='Present 2023 & 2024'~'steelblue',present=='Loss 2024'~'tomato',present=='Gain 2024'~'limegreen'))
    # print(unique(df$colour))
   return(left_join(df,meta_data_map,by='HBRC_Site_Name'))
   })

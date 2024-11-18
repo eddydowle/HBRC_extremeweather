@@ -8,18 +8,19 @@
 #
 
 #better site analysis no all samples
-
+library('rsconnect')
+library('remotes')
 library('shiny')
 library('microViz')
 library('RColorBrewer')
 library('tidyverse')
-library('readxl')
+#library('readxl')
 library('devtools')
-library('tidyverse')
-library('viridis')
-library('indicspecies') 
+#library('tidyverse')
+#library('viridis')
+#library('indicspecies') 
 library('vegan')
-library('glue')
+#library('glue')
 library('reshape2')
 library('phyloseq')
 library('iNEXT.3D') 
@@ -28,11 +29,13 @@ library('microbiome')
 library('gridExtra')
 library('ranacapa')
 library('stargazer')
+library('BiocManager')
+options(repos = BiocManager::repositories())
 #think use stargazer to render the beta diversity table
 #https://groups.google.com/g/shiny-discuss/c/3VYuD6gjdk4?pli=1
 
 #input into phyloseq
-setwd("~/Dropbox (Personal)/Otago_2023 (1)/BiomeGene/extremeweatherevents/ASV_files/OneDrive_1_7-05-2024/")
+#setwd("~/Dropbox (Personal)/Otago_2023 (1)/BiomeGene/extremeweatherevents/ASV_files/OneDrive_1_7-05-2024/")
 #samples<-read.csv('HBRC_samples_Eddy.csv')
 #records<-read.csv('HBRC_records_Eddy.csv')
 meta_data<-read.table('Wilderlab_meta_out_clean.txt',sep='\t',quote='',header =T)
@@ -43,7 +46,28 @@ meta_data<-read.table('Wilderlab_meta_out_clean.txt',sep='\t',quote='',header =T
 #taxa_table<-records %>% select(TaxID,Phylum,Class,Order,Family,Genus,Species) %>% distinct()
 #write.table(taxa_table,'HBRC_records_Eddy_taxa_table.txt',sep='\t',quote=F,row.names = F)
 
-otu_table<-read.csv('HBRC_records_Eddy_otu_table.txt',header=T,row.names=NULL,sep='\t',quote='')
+#otu_table<-read.csv('HBRC_records_Eddy_otu_table.txt',header=T,row.names=NULL,sep='\t',quote='')
+#otu_table_filtered<-otu_table %>% filter(PrimerSet=='CI'|PrimerSet=='BE'|PrimerSet=='BU'|PrimerSet=='MZ'|PrimerSet=='RV'|PrimerSet=='TP'|PrimerSet=='UM'|PrimerSet=='WV')
+#otu_table_filtered<-otu_table_filtered %>% filter(UID %in% meta_data$UID)
+#otu_table<-otu_table_filtered
+#write.table(otu_table,'HBRC_records_Eddy_otu_table.txt',sep='\t',quote=F,row.names = F)
+#otu_table_filtered_CI<-otu_table_filtered %>% filter(PrimerSet=='CI')
+#otu_table_filtered_BE<-otu_table_filtered %>% filter(PrimerSet=='BE')
+#otu_table_filtered_BU<-otu_table_filtered %>% filter(PrimerSet=='BU')
+#otu_table_filtered_MZ<-otu_table_filtered %>% filter(PrimerSet=='MZ')
+#otu_table_filtered_RV<-otu_table_filtered %>% filter(PrimerSet=='RV')
+#otu_table_filtered_TP<-otu_table_filtered %>% filter(PrimerSet=='TP')
+#otu_table_filtered_UM<-otu_table_filtered %>% filter(PrimerSet=='UM')
+#otu_table_filtered_WV<-otu_table_filtered %>% filter(PrimerSet=='WV')
+#write.table(otu_table_filtered_CI,'HBRC_records_Eddy_otu_table_CI.txt',sep='\t',quote=F,row.names = F)
+#write.table(otu_table_filtered_BE,'HBRC_records_Eddy_otu_table_BE.txt',sep='\t',quote=F,row.names = F)
+#write.table(otu_table_filtered_BU,'HBRC_records_Eddy_otu_table_BU.txt',sep='\t',quote=F,row.names = F)
+#write.table(otu_table_filtered_MZ,'HBRC_records_Eddy_otu_table_MZ.txt',sep='\t',quote=F,row.names = F)
+#write.table(otu_table_filtered_RV,'HBRC_records_Eddy_otu_table_RV.txt',sep='\t',quote=F,row.names = F)
+#write.table(otu_table_filtered_TP,'HBRC_records_Eddy_otu_table_TP.txt',sep='\t',quote=F,row.names = F)
+#write.table(otu_table_filtered_UM,'HBRC_records_Eddy_otu_table_UM.txt',sep='\t',quote=F,row.names = F)
+#write.table(otu_table_filtered_WV,'HBRC_records_Eddy_otu_table_WV.txt',sep='\t',quote=F,row.names = F)
+
 taxa_table<-read.csv('HBRC_records_Eddy_taxa_table.txt',header=T,row.names=NULL,sep='\t',quote='')
 freshwater_taxa<-read.table('freshwater_invertsfish.txt',header=T,row.names=NULL,sep='\t')
 
@@ -56,7 +80,7 @@ function(input, output, session) {
   specieslist$result<-NULL
   #,input$subset_data_insects
   observeEvent(c(input$site_choice,input$assay,input$subset_data_freshwater,input$subset_data_rest,input$subset_data_insects),{
-    if (input$subset_data_insects=="Just freshwater"  & input$assay=='CI: Mostly insects' | input$subset_data_freshwater=="Just freshwater"  & input$assay=='RV: Vertebrates' | input$subset_data_freshwater=="Just freshwater"  & input$assay=='WV: Vertebrates'){
+    if (input$subset_data_insects=="Just freshwater" & input$assay=='CI: Mostly insects' | input$subset_data_freshwater=="Just freshwater" & input$assay=='RV: Vertebrates' | input$subset_data_freshwater=="Just freshwater" & input$assay=='WV: Vertebrates'){
       specieslist$result<-'freshwater'
     }      
     else  if (input$subset_data_freshwater=="Fish (Order filter)"  & input$assay=='RV: Vertebrates' | input$subset_data_freshwater=="Fish (Order filter)"  & input$assay=='WV: Vertebrates'){
@@ -71,15 +95,47 @@ function(input, output, session) {
     else {
       specieslist$result<-'all'
     }
-    print(specieslist$result)
-    print(specieslist$result)  
+  #  print(specieslist$result)
+    print(c('observeEvent',specieslist$result))
   })
+
+  #moved here to try and get the file sizes smaller going into the phyloseq
+  meta_data_clean<- reactive({
+    meta_data_2<-meta_data %>% mutate(location_date=paste(HBRC_Site_Name,CollectionDate,sep = '_')) %>% mutate(location_cyclone=paste(HBRC_Site_Name,Cyclone,sep = '_'))
+#    meta_data_cl <-meta_data_2 %>% filter(UID %in% otu_table_subset()$UID)
+    meta_data_cl <-meta_data_2 
+    row.names(meta_data_cl) <- meta_data_cl$UID
+    meta_data_cl[1] <- NULL
+    #print(meta_data_cl)
+    print('meta_data_clean')
+    samples_tokeep<-meta_data_cl %>% rownames_to_column('gene') %>% filter(HBRC_Site_Name==input$site_choice) %>% column_to_rownames('gene')
+  #  print(head(samples_tokeep))
+  #  print(head(meta_data_cl))
+ #   return(meta_data_cl)
+    return(samples_tokeep)
+  })  
   
-  otu_table_subset<- reactive({
-    otu_table_filtered<-otu_table %>% filter(PrimerSet == sub(":.*", "",input$assay)) %>% select(-PrimerSet) 
-    #   print(otu_table_filtered)
-    #   otu_table_filtered<-otu_table %>% filter(PrimerSet == input$assay) %>% select(-PrimerSet) 
-    #    if (input$subset_data_CI == "Just freshwater" | input$subset_data_RV == "Just freshwater" |input$subset_data_WV == "Just freshwater" ) {
+  #because otherwise it will repull anytime there is a filter change in addition to an assay change
+  otu_table_grab<- reactive({
+  otu_table_filtered<-read.csv(paste("HBRC_records_Eddy_otu_table_",sub(":.*", "",input$assay),".txt",sep = ""),header=T,row.names=NULL,sep='\t',quote='')
+  print('bringing in file')
+  return(otu_table_filtered)
+})
+
+  
+  
+    otu_table_subset<- reactive({
+    print('here')
+#    otu_table_filtered<-read.csv(paste("HBRC_records_Eddy_otu_table_",sub(":.*", "",input$assay),".txt",sep = ""),header=T,row.names=NULL,sep='\t',quote='')
+   # test<-read.csv(paste("HBRC_records_Eddy_otu_table_",sub(":.*", "",'CI: Mostly insects'),".txt",sep = ""),header=T,row.names=NULL,sep='\t',quote='')
+#    test<-read.csv("HBRC_records_Eddy_otu_table_CI.txt",header=T,row.names=NULL,sep='\t',quote='')
+    #    head(otu_table_filtered)
+#assaychosen<-paste("HBRC_records_Eddy_otu_table_",sub(":.*", "",input$assay),".txt",sep = "")
+#print(assaychosen)
+  #this works if pulling from one file    
+      #  otu_table_filtered<-otu_table %>% filter(PrimerSet == sub(":.*", "",input$assay)) %>% select(-PrimerSet) 
+       print('species filtering')
+       subset_samp_uid<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% pull(sample_id)
     if (specieslist$result == 'freshwater') {
       print('just freshwater')
       family<-freshwater_taxa %>% filter(Rank == 'Family')
@@ -88,7 +144,11 @@ function(input, output, session) {
       order<-freshwater_taxa %>% filter(Rank == 'Order')
       class<-freshwater_taxa %>% filter(Rank == 'Class')
       records_eukaryote_freshwater<-taxa_table %>% filter(Phylum %in% phylum$ID | Family %in% family$ID | Genus %in% genus$ID | Order %in% order$ID | Class %in% class$ID)
-      otu_table_filtered_freshwater <- otu_table_filtered %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+      subset_samp_uid<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% pull(sample_id)
+      print(subset_samp_uid)
+ #     otu_table_filtered_freshwater <- otu_table_filtered %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+      otu_table_filtered_freshwater <- otu_table_grab() %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+      otu_table_filtered_freshwater<-otu_table_filtered_freshwater %>% filter(UID %in% subset_samp_uid)
       return(otu_table_filtered_freshwater)
     }
     if (specieslist$result == 'fish') {
@@ -96,13 +156,17 @@ function(input, output, session) {
       #  Class=="Actinopteri" |Class=="Cladistia" |Class=='Hyperoartia'
     #  class<-freshwater_taxa %>% filter(Rank == 'Class')
       records_eukaryote_freshwater<-taxa_table %>% filter(Class %in% c('Actinopteri','Hyperoartia'))
-      otu_table_filtered_freshwater <- otu_table_filtered %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+  #    otu_table_filtered_freshwater <- otu_table_filtered %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+      otu_table_filtered_freshwater <- otu_table_grab() %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+      otu_table_filtered_freshwater<-otu_table_filtered_freshwater %>% filter(UID %in% subset_samp_uid)
       return(otu_table_filtered_freshwater)
     }
     if (specieslist$result=='fishgenus'){
       print('fish_genus')
       records_eukaryote_freshwater<-taxa_table %>% filter(Genus %in% c('Aldrichetta','Anguilla','Carassius','Cheimarrichthys','Ctenopharyngodon','Cyprinus','Galaxias','Gambusia','Geotria','Gobiomorphus','Mugil','Oncorhynchus','Retropinna','Rhombosolea,Salmo'))
-      otu_table_filtered_freshwater <- otu_table_filtered %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+ #     otu_table_filtered_freshwater <- otu_table_filtered %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+      otu_table_filtered_freshwater <- otu_table_grab() %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+      otu_table_filtered_freshwater<-otu_table_filtered_freshwater %>% filter(UID %in% subset_samp_uid)
       return(otu_table_filtered_freshwater)
     }
     if (specieslist$result == 'ept') {
@@ -110,29 +174,36 @@ function(input, output, session) {
       #  Class=="Actinopteri" |Class=="Cladistia" |Class=='Hyperoartia'
   #    class<-freshwater_taxa %>% filter(Rank == 'Class')
       records_eukaryote_freshwater<-taxa_table %>% filter(Order %in% c('Ephemeroptera', 'Plecoptera', 'Trichoptera'))
-      otu_table_filtered_freshwater <- otu_table_filtered %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
-      return(otu_table_filtered_freshwater)
+ #     otu_table_filtered_freshwater <- otu_table_filtered %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+      otu_table_filtered_freshwater <- otu_table_grab() %>% filter(TaxID %in% records_eukaryote_freshwater$TaxID)
+      # print(subset_samp_uid)
+      otu_table_filtered_freshwater<-otu_table_filtered_freshwater %>% filter(UID %in% subset_samp_uid)
+        return(otu_table_filtered_freshwater)
     }
     else{
       print('all')
-      return(otu_table_filtered)
+    #  print(meta_data_clean())
+     # subset_samp_uid<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% pull(sample_id)
+     # print(subset_samp_uid)
+      filter_site_otu<-otu_table_grab() %>% filter(UID %in% subset_samp_uid)
+    #  print(filter_site_otu)
+      return(filter_site_otu)
     }
-    #maybe can do a if xx | xx | xx == 'Just Freshwater'
-    #do filter
-    #like this https://stackoverflow.com/questions/50926109/conditional-filtering-based-on-user-inputs-in-shiny ??
-  })
-  #testing table
-  #  output[["table1"]] <- renderTable({otu_table_subset()%>%  slice_head(n=10)})
-  # output$table1 <- renderTable({ otu_table %>% filter(PrimerSet == input$assay) %>% select(-PrimerSet) %>% group_by(UID, TaxID) %>% slice_head(n=10)  })
-  #meta data for phyloseq
-  meta_data_clean<- reactive({
-    meta_data_2<-meta_data %>% mutate(location_date=paste(HBRC_Site_Name,CollectionDate,sep = '_')) %>% mutate(location_cyclone=paste(HBRC_Site_Name,Cyclone,sep = '_'))
-    meta_data_cl <-meta_data_2 %>% filter(UID %in% otu_table_subset()$UID)
-    row.names(meta_data_cl) <- meta_data_cl$UID
-    meta_data_cl[1] <- NULL
+   })
+
+ #this worked then I rearranged to add the filter in early on to drop the file sizes   
+#  meta_data_clean<- reactive({
+#    meta_data_2<-meta_data %>% mutate(location_date=paste(HBRC_Site_Name,CollectionDate,sep = '_')) %>% mutate(location_cyclone=paste(HBRC_Site_Name,Cyclone,sep = '_'))
+#    meta_data_cl <-meta_data_2 %>% filter(UID %in% otu_table_subset()$UID)
+ #   row.names(meta_data_cl) <- meta_data_cl$UID
+#    meta_data_cl[1] <- NULL
     #print(meta_data_cl)
-    return(meta_data_cl)
-  })
+ #   print('meta_data_clean')
+#    samples_tokeep<-meta_data_cl %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice)
+ #   print(head(samples_tokeep))
+  #  print(head(meta_data_cl))
+   # return(meta_data_cl)
+#  })
   #taxa table for phyloseq
   taxa_table_clean_phyloseq <- reactive ({
     taxa_table_clean <- taxa_table %>% filter(TaxID %in% otu_table_subset()$TaxID)
@@ -142,6 +213,7 @@ function(input, output, session) {
     taxa_table_clean$root<-'Root'
     taxa_table_clean <- taxa_table_clean %>%
       select(root, everything())
+    print('Taxa_table_clean')
     return(as.matrix(taxa_table_clean))
   })
   
@@ -151,6 +223,7 @@ function(input, output, session) {
     out_table_MZ_wide<-out_table_MZ_wide[complete.cases(out_table_MZ_wide), ]
     row.names(out_table_MZ_wide) <- out_table_MZ_wide$TaxID
     out_table_MZ_wide[1] <- NULL
+    print('otu_table_wide_clean')
     return(out_table_MZ_wide)
   })
   
@@ -162,18 +235,26 @@ function(input, output, session) {
     otu <- otu_table(otu_table_wide_clean_phyloseq(), taxa_are_rows = TRUE) 
     taxa <- tax_table(taxa_table_clean_phyloseq())
     sample <- sample_data(meta_data_clean())
+    print(head(otu))
+    print(head(taxa))
+    print(head(sample))
     test<-meta_data_clean()[order(as.Date(meta_data_clean()$CollectionDate, format="%d/%m/%Y")),]
     test_names<-row.names(test)
     FisheDNA<-phyloseq(otu, taxa, sample)
+    print('made_phyloseq_object')
+    print(test_names)
     # print(sample_data(FisheDNA))
     #FisheDNA<-ps_reorder(FisheDNA, test_names)
-    FisheDNA.5<-ps_reorder(FisheDNA, test_names)
+    print(sample_data(FisheDNA))
+   # FisheDNA.5<-ps_reorder(FisheDNA, test_names)
+    FisheDNA.5<-FisheDNA
+    print('reordered')
     #remove singletons (moving this down to after other filters)
     #    FisheDNA.5 <- filter_taxa(FisheDNA, function(x){sum(x > 0) > 1}, prune=TRUE)          
-    to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice) %>% pull(sample_id)
+  #  to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice) %>% pull(sample_id)
     # print(to_prune)
-    FisheDNA.5<-prune_samples(to_prune,FisheDNA.5)
-    # print(FisheDNA.5)
+ #   FisheDNA.5<-prune_samples(to_prune,FisheDNA.5)
+     print(FisheDNA.5)
     #filter those with less than 5 replicates
     #this is important when the taxa filters come on as it causes some samples to drop out if there is no target taxa ~ which means some samples will drop between taxa filters but this seems the best way around it. 
     filter<-as.data.frame(sample_data(FisheDNA.5)) %>% group_by(CollectionDate) %>% summarise(count=n()) %>% filter(count >=5) 
@@ -189,6 +270,7 @@ function(input, output, session) {
     #print(sample_names(FisheDNA.5))
     FisheDNA.5 <- prune_samples(sample_sums(FisheDNA.5) >= 1, FisheDNA.5)
     #   print(otu_table(FisheDNA.5))
+    print('end_phyloseq')
     return(FisheDNA.5)
   })
   #then should be able to build plots from phyloseq_object
@@ -298,7 +380,9 @@ function(input, output, session) {
     
     if (input$analysis == "Site analysis") 
     {    
-      phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa') #pa dataset
+      #shouldnt be presence absence if we are allowing for shannon and simpson estimates
+      phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'identity') #raw
+#      phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa')#pa dataset
       rich<-estimate_richness(phyloseq_object_prune.pa, measures=c(input$diversity_measure))
       Fish_Sample = as(sample_data(phyloseq_object_prune.pa), "matrix")
       rich<-cbind(rich, Fish_Sample)

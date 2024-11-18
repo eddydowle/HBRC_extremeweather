@@ -8,26 +8,26 @@
 #
 
 library('shiny')
-library('DT')
-library('data.table')
+#library('DT')
+#library('data.table')
 library('tidyverse')
-library('readxl')
+#library('readxl')
 library('devtools')
 library('tidyverse')
-library('viridis')
-library('indicspecies') 
-library('vegan')
-library('glue')
-library('reshape2')
-library('phyloseq')
-library('iNEXT.3D') 
+#library('viridis')
+#library('indicspecies') 
+#library('vegan')
+#library('glue')
+#library('reshape2')
+#library('phyloseq')
+#library('iNEXT.3D') 
 library('ggplot2') 
-library('microbiome')
+#library('microbiome')
 library('leaflet')
 
 
-setwd("~/Dropbox (Personal)/Otago_2023 (1)/BiomeGene/extremeweatherevents/ASV_files/OneDrive_1_7-05-2024/")
-meta_data_map<-read.table('Wilderlab_meta_map.txt',sep='\t',quote='',header =T)
+#setwd("~/Dropbox (Personal)/Otago_2023 (1)/BiomeGene/extremeweatherevents/ASV_files/OneDrive_1_7-05-2024/")
+meta_data_map<-read.table('Wilderlab_meta_map2.txt',sep='\t',quote='',header =T)
 
 #records<-read.csv('HBRC_records_Eddy.csv')
 #bring in meta data
@@ -48,15 +48,30 @@ meta_data_map<-read.table('Wilderlab_meta_map.txt',sep='\t',quote='',header =T)
 #test<-left_join(records_eukaryote_freshwater,meta_data,by='UID')
 #write.table(test,'HBRC_records_Eddy_freshwater_season.txt',sep='\t',quote=F,row.names = F)
 test<-read.table('HBRC_records_Eddy_freshwater_season.txt',header=T,row.names=NULL,sep='\t',quote='')
-
+#need to filter it for the 8 common assays
+#CI: Mostly insects","BE: General Eukaryote","BU: General Eukaryote","MZ: Vascular Plants","RV: Vertebrates","TP: Vascular Plants","UM: Microbe","WV: Vertebrates"
+#test2<-test %>% filter(PrimerSet=='CI'|PrimerSet=='BE'|PrimerSet=='BU'|PrimerSet=='MZ'|PrimerSet=='RV'|PrimerSet=='TP'|PrimerSet=='UM'|PrimerSet=='WV')
+#write.table(test2,'HBRC_records_Eddy_freshwater_season.txt',sep='\t',quote=F,row.names = F)
 
 function(input, output, session) {
   
- output$secondSelection<-renderUI({selectInput("taxa", "Select taxa", choices =sort((test %>% select(input$level)  %>% unique()) [,1]))})
+ output$secondSelection<-renderUI({
+   if (input$filter_group=='All'){
+     test_filtered<-test
+   }
+   if (input$filter_group=='Insecta'){
+     test_filtered<-test %>% filter(Class=='Insecta')
+   }
+   if (input$filter_group=='Freshwater fish'){
+     test_filtered<-test %>% filter(Class %in% c('Actinopteri','Hyperoartia'))
+   }
+   selectInput("taxa", "Select taxa", choices =sort((test_filtered %>% select(input$level)  %>% unique()) [,1]))
+   })
 
   #probably should be more like summer 2021, summer 2022 or something
   test_filtered<- reactive({
     test_filtered_select<-test %>% filter(eval(parse(text = paste0(input$level))) == input$taxa)
+  #  print('here')
   #  dropping 2019-2020 as there is only one site
     if (input$integer == '2023-2024') {
       year2021_filtered<-test_filtered_select %>% filter(season=='2023-2024' ) %>% select(HBRC_Site_Name) %>% distinct()
@@ -135,7 +150,7 @@ function(input, output, session) {
    # print(df)
     #set colours for map
     df<-df %>% mutate(colour=case_when(present == 'Absent' ~ 'grey',present == 'Present 2023-2024' ~ 'steelblue', present=='Present 2020-2021' ~'steelblue', present=='Present 2021-2022'~ 'steelblue', present=='Present 2022-2023'~'steelblue',present=='Absent pre & post'~'grey',present=='Present pre & post' ~'steelblue',present=='Loss post-cyclone'~'tomato',present=='Gain post-cyclone'~"limegreen",present=='Absent 2023 & 2024'~'grey',present=='Present 2023 & 2024'~'steelblue',present=='Loss 2024'~'tomato',present=='Gain 2024'~'limegreen'))
-   # print(unique(df$colour))
+  # print(head(df))
   return(left_join(df,meta_data_map,by='HBRC_Site_Name'))
   })
   
@@ -144,8 +159,8 @@ function(input, output, session) {
   #colorFactor(
   #palette = 'Dark2',
   #domain = test_filtered_pal$present)
-  print(unique(test_filtered_pal$colour))
-  print(unique(as.factor(test_filtered_pal$present)))
+ # print(unique(test_filtered_pal$colour))
+ # print(unique(as.factor(test_filtered_pal$present)))
   test_filtered_pal$present<-factor(test_filtered_pal$present, levels=unique(test_filtered_pal$present))
   colorFactor(palette=unique(test_filtered_pal$colour),
               domain=test_filtered_pal$present
@@ -162,6 +177,12 @@ function(input, output, session) {
     addLegend("bottomright", pal = test_filtered_col(), values = ~present,
               title = "Presence/absence",
               opacity = 1) 
+  })
+  
+  output$table <- DT::renderDataTable({
+    tab_out<-test_filtered() %>% rename(Status = present) %>% select(HBRC_Site_Name,Status,HBRC_Site_ID) %>% arrange(HBRC_Site_Name)
+    tab_out %>% 
+      DT::datatable()
   })
   
     }

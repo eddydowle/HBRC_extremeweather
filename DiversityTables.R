@@ -50,9 +50,9 @@ otu_table <- records %>% select(UID, PrimerSet, Count, TaxID)
 otu_table_splitout <- split(otu_table, otu_table$PrimerSet)
 
 #will need to do this for 3 freshwater animal sets CI, RV and WV
-#out_table_MZ<- otu_table_splitout$CI %>% select(-PrimerSet) %>% group_by(UID, TaxID)
+out_table_MZ<- otu_table_splitout$CI %>% select(-PrimerSet) %>% group_by(UID, TaxID)
 #out_table_MZ<- otu_table_splitout$RV %>% select(-PrimerSet) %>% group_by(UID, TaxID)
-out_table_MZ<- otu_table_splitout$WV %>% select(-PrimerSet) %>% group_by(UID, TaxID)
+#out_table_MZ<- otu_table_splitout$WV %>% select(-PrimerSet) %>% group_by(UID, TaxID)
 
 #freshwater table
 freshwater_taxa<-read.table('freshwater_invertsfish.txt',header=T,row.names=NULL,sep='\t')
@@ -112,7 +112,11 @@ sample_list<-unique(samp$HBRC_Site_Name) #just site names for loop
 
 
 #here is the loop to make the file and the reasoning is below
+######################################################
+######calculate the raw average diversity change######
+######################################################
 outtab<-NULL
+outtab_hill<-NULL
 
 for (item in sample_list){
   print(item)
@@ -127,10 +131,13 @@ for (item in sample_list){
     print(to_prune_within)
     FisheDNA_cut<-prune_samples(to_prune_within,FisheDNA)
     sample_data(FisheDNA_cut)
-    phyloseq_object_prune.pa <- microbiome::transform(FisheDNA_cut, 'identity') #raw
-    #      phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa')#pa dataset
-    rich<-estimate_richness(phyloseq_object_prune.pa, measures=c("Shannon", "Simpson", "Observed"))
+    phyloseq_object_prune.raw <- microbiome::transform(FisheDNA_cut, 'identity') #raw
+    phyloseq_object_prune.pa <- microbiome::transform(FisheDNA_cut, 'pa') #presence/absence
+    mergedGP = merge_samples(phyloseq_object_prune.pa, "CollectionDate") #sum counts across for hill counts from PA
+    rich<-estimate_richness(phyloseq_object_prune.raw, measures=c("Shannon", "Simpson", "Observed"))
+    rich_hill<-estimate_richness(mergedGP, measures=c("Shannon", "Simpson", "Observed"))
     print(rich)
+    print(rich_hill)
     date_selected<-as.Date(subdate,format="%d/%m/%y")
     print(date_selected)
     if (date_selected>='2019-11-01' & date_selected<='2020-05-31'){
@@ -174,25 +181,317 @@ for (item in sample_list){
       season<-'2023_winter'
     }
     rich_mod<-  colMeans(rich) %>% as.data.frame() %>% rename_with(~season) %>% rownames_to_column("Richness_test") %>%  pivot_longer(cols=c(-Richness_test),names_to="Season") %>%  pivot_wider(names_from=c(Richness_test)) %>% mutate(location=item) %>% mutate(date_col=subdate)
+    print(as.data.frame(colMeans(rich)))
+    print(as.data.frame(t(rich_hill)))
+    rich_mod_hill<-  as.data.frame(t(rich_hill)) %>% rename_with(~season) %>% rownames_to_column("Richness_test") %>%  pivot_longer(cols=c(-Richness_test),names_to="Season") %>%  pivot_wider(names_from=c(Richness_test)) %>% mutate(location=item) %>% mutate(date_col=subdate)
     print(rich_mod)
+    print(rich_mod_hill)
     outtab<-bind_rows(outtab,rich_mod)
+    outtab_hill<-bind_rows(outtab_hill,rich_mod_hill)
   }
 }
 
 #write.table(outtab,'Diversity_estimates_persite_assay_CI_rawotu.txt',row.names=F,quote=F,sep='\t')
 #write.table(outtab,'Diversity_estimates_persite_assay_RV_rawotu.txt',row.names=F,quote=F,sep='\t')
-write.table(outtab,'Diversity_estimates_persite_assay_WV_rawotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab,'Diversity_estimates_persite_assay_WV_rawotu.txt',row.names=F,quote=F,sep='\t')
+
+#write.table(outtab_hill,'Diversity_estimates_persite_assay_CI_hillotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_hill,'Diversity_estimates_persite_assay_RV_hillotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_hill,'Diversity_estimates_persite_assay_WV_hillotu.txt',row.names=F,quote=F,sep='\t')
+
+
+###########################
+#generate diversity change#
+###########################
+
+#directly prior to and post cyclone
+#outtab<-read.table('Diversity_estimates_persite_assay_CI_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_estimates_persite_assay_RV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_estimates_persite_assay_WV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+#hill numbers
+#outtab<-read.table('Diversity_estimates_persite_assay_CI_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_estimates_persite_assay_RV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+outtab<-read.table('Diversity_estimates_persite_assay_WV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+head(outtab)
+outtab_2021_2022<-outtab %>% filter(Season=='2021-2022_summer')
+#2022-2023 season only occured post cyclone so can use all samples from here
+outtab_2022_2023<-outtab %>% filter(Season=='2022-2023_summer')
+
+#some have been sampled more than once in a season
+outtab_2021_2022[duplicated(outtab_2021_2022$location),]
+outtab_2021_2022 %>% filter(location=='Mangatutu Strm at Mangatutu Rd')
+outtab_2021_2022 %>% filter(location=='Mangaone Rvr at Rissington')
+outtab_2021_2022 %>% filter(location=='Tutaekuri Rvr at Lawrence hut')
+
+outtab_2022_2023[duplicated(outtab_2022_2023$location),]
+outtab_2022_2023 %>% filter(location=='Maraekakaho at Kereru Rd')
+
+#neither of these are the same what I will do is include both and we can either keep both in for the analysis or drop or average
+
+outtab_2022_2023<-outtab_2022_2023 %>% rename_with(~paste0(., "_2022_2023", grep("^[A-Z]$", names(.))))
+outtab_2022_2023$location_2022_2023
+names(outtab_2022_2023)[names(outtab_2022_2023) == 'location_2022_2023'] <- 'location'
+
+outtab_2021_2022<-outtab_2021_2022 %>% rename_with(~paste0(., "_2021_2022", grep("^[A-Z]$", names(.))))
+names(outtab_2021_2022)[names(outtab_2021_2022) == 'location_2021_2022'] <- 'location'
+
+outtab_joint<-inner_join(outtab_2022_2023,outtab_2021_2022,by='location')
+
+#these two have multiple samples, suggest just picking one for model but will leave in for now. One of the lawrence hut ones in a may sample which I want to run with and without the may samples anyway
+#'Mangaone Rvr at Rissington'
+#'Maraekakaho at Kereru Rd'
+#Tutaekuri Rvr at Lawrence hut
+head(outtab_joint$Observed_2021_2022)
+head(outtab_joint$Observed_2022_2023)
+#okay now calculate the diversity difference
+outtab_joint$Difference_observed<-outtab_joint$Observed_2022_2023-outtab_joint$Observed_2021_2022
+outtab_joint$Difference_simpson<-outtab_joint$Simpson_2022_2023-outtab_joint$Simpson_2021_2022
+outtab_joint$Difference_shannon<-outtab_joint$Shannon_2022_2023-outtab_joint$Shannon_2021_2022
+
+
+#write.table(outtab_joint,'Diversity_differences20212022_20222023_persite_assay_CI_rawotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_joint,'Diversity_differences20212022_20222023_persite_assay_RV_rawotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_joint,'Diversity_differences20212022_20222023_assay_WV_rawotu.txt',row.names=F,quote=F,sep='\t')
+
+#write.table(outtab_joint,'Diversity_differences20212022_20222023_persite_assay_CI_hillotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_joint,'Diversity_differences20212022_20222023_persite_assay_RV_hillotu.txt',row.names=F,quote=F,sep='\t')
+write.table(outtab_joint,'Diversity_differences20212022_20222023_assay_WV_hillotu.txt',row.names=F,quote=F,sep='\t')
+
+#now do difference directly after cyclone to one year later
+#remembering that 2022-2023 season is all postcyclone
+
+#outtab<-read.table('Diversity_estimates_persite_assay_CI_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_estimates_persite_assay_RV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_estimates_persite_assay_WV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#hill numbers
+#outtab<-read.table('Diversity_estimates_persite_assay_CI_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_estimates_persite_assay_RV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+outtab<-read.table('Diversity_estimates_persite_assay_WV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+head(outtab)
+outtab_2022_2023<-outtab %>% filter(Season=='2022-2023_summer')
+#2022-2023 season only occured post cyclone so can use all samples from here
+outtab_2023_2024<-outtab %>% filter(Season=='2023-2024_summer')
+
+#some have been sampled more than once in a season
+outtab_2022_2023[duplicated(outtab_2022_2023$location),]
+outtab_2022_2023 %>% filter(location=='Maraekakaho at Kereru Rd')
+
+outtab_2023_2024[duplicated(outtab_2023_2024$location),]
+#lots
+
+#neither of these are the same what I will do is include both and we can either keep both in for the analysis or drop or average
+
+outtab_2022_2023<-outtab_2022_2023 %>% rename_with(~paste0(., "_2022_2023", grep("^[A-Z]$", names(.))))
+outtab_2022_2023$location_2022_2023
+names(outtab_2022_2023)[names(outtab_2022_2023) == 'location_2022_2023'] <- 'location'
+
+outtab_2023_2024<-outtab_2023_2024 %>% rename_with(~paste0(., "_2023_2024", grep("^[A-Z]$", names(.))))
+names(outtab_2023_2024)[names(outtab_2023_2024) == 'location_2023_2024'] <- 'location'
+
+outtab_joint<-inner_join(outtab_2022_2023,outtab_2023_2024,by='location')
+#~12 have dups
+outtab_joint[duplicated(outtab_joint$location),]
+#okay now calculate the diversity difference
+outtab_joint$Difference_observed<-outtab_joint$Observed_2023_2024-outtab_joint$Observed_2022_2023
+outtab_joint$Difference_simpson<-outtab_joint$Simpson_2023_2024-outtab_joint$Simpson_2022_2023
+outtab_joint$Difference_shannon<-outtab_joint$Shannon_2023_2024-outtab_joint$Simpson_2022_2023
+
+#write.table(outtab_joint,'Diversity_differences20222023_20232024_persite_assay_CI_rawotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_joint,'Diversity_differences20222023_20232024_persite_assay_RV_rawotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_joint,'Diversity_differences20222023_20232024_assay_WV_rawotu.txt',row.names=F,quote=F,sep='\t')
+
+#write.table(outtab_joint,'Diversity_differences20222023_20232024_persite_assay_CI_hillotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_joint,'Diversity_differences20222023_20232024_persite_assay_RV_hillotu.txt',row.names=F,quote=F,sep='\t')
+write.table(outtab_joint,'Diversity_differences20222023_20232024_assay_WV_hillotu.txt',row.names=F,quote=F,sep='\t')
+
+#okay now I need to merge my diversity changes with Ash's variables
+
+#######
+#now do difference directly pre cyclone to one year later
+#2021-2022 season vs 2023-2024
+#######
+
+#outtab<-read.table('Diversity_estimates_persite_assay_CI_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_estimates_persite_assay_RV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_estimates_persite_assay_WV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#hill numbers
+#outtab<-read.table('Diversity_estimates_persite_assay_CI_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_estimates_persite_assay_RV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+outtab<-read.table('Diversity_estimates_persite_assay_WV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+head(outtab)
+outtab_2021_2022<-outtab %>% filter(Season=='2021-2022_summer')
+#2022-2023 season only occured post cyclone so can use all samples from here
+outtab_2023_2024<-outtab %>% filter(Season=='2023-2024_summer')
+
+#some have been sampled more than once in a season
+outtab_2021_2022[duplicated(outtab_2021_2022$location),]
+
+outtab_2023_2024[duplicated(outtab_2023_2024$location),]
+#lots
+
+#neither of these are the same what I will do is include both and we can either keep both in for the analysis or drop or average
+
+outtab_2021_2022<-outtab_2021_2022 %>% rename_with(~paste0(., "_2021_2022", grep("^[A-Z]$", names(.))))
+outtab_2021_2022$location_2021_2022
+names(outtab_2021_2022)[names(outtab_2021_2022) == 'location_2021_2022'] <- 'location'
+
+outtab_2023_2024<-outtab_2023_2024 %>% rename_with(~paste0(., "_2023_2024", grep("^[A-Z]$", names(.))))
+names(outtab_2023_2024)[names(outtab_2023_2024) == 'location_2023_2024'] <- 'location'
+
+outtab_joint<-inner_join(outtab_2021_2022,outtab_2023_2024,by='location')
+#~12 have dups
+outtab_joint[duplicated(outtab_joint$location),]
+#okay now calculate the diversity difference
+outtab_joint$Difference_observed<-outtab_joint$Observed_2023_2024-outtab_joint$Observed_2021_2022
+outtab_joint$Difference_simpson<-outtab_joint$Simpson_2023_2024-outtab_joint$Simpson_2021_2022
+outtab_joint$Difference_shannon<-outtab_joint$Shannon_2023_2024-outtab_joint$Simpson_2021_2022
+
+#write.table(outtab_joint,'Diversity_differences20212022_20232024_persite_assay_CI_rawotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_joint,'Diversity_differences20212022_20232024_persite_assay_RV_rawotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_joint,'Diversity_differences20212022_20232024_persite_assay_WV_rawotu.txt',row.names=F,quote=F,sep='\t')
+
+#write.table(outtab_joint,'Diversity_differences20212022_20232024_persite_assay_CI_hillotu.txt',row.names=F,quote=F,sep='\t')
+#write.table(outtab_joint,'Diversity_differences20212022_20232024_persite_assay_RV_hillotu.txt',row.names=F,quote=F,sep='\t')
+write.table(outtab_joint,'Diversity_differences20212022_20232024_persite_assay_WV_hillotu.txt',row.names=F,quote=F,sep='\t')
 
 
 #
+#just making some figures of the diversity changes
+
+#outtab<-read.table('Diversity_differences20222023_20232024_assay_WV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20222023_assay_WV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+#outtab<-read.table('Diversity_differences20222023_20232024_persite_assay_CI_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20222023_persite_assay_CI_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+#outtab<-read.table('Diversity_differences20222023_20232024_persite_assay_RV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20222023_persite_assay_RV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+#outtab<-read.table('Diversity_differences20212022_20232024_persite_assay_CI_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20232024_persite_assay_RV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20232024_persite_assay_WV_rawotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+#hill observed for comparison
+#outtab<-read.table('Diversity_differences20222023_20232024_assay_WV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20222023_assay_WV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+outtab<-read.table('Diversity_differences20212022_20232024_persite_assay_WV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+#outtab<-read.table('Diversity_differences20222023_20232024_persite_assay_CI_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20222023_persite_assay_CI_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20232024_persite_assay_CI_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+#outtab<-read.table('Diversity_differences20222023_20232024_persite_assay_RV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20222023_persite_assay_RV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+#outtab<-read.table('Diversity_differences20212022_20232024_persite_assay_RV_hillotu.txt',row.names=NULL,quote="",sep='\t',header=T)
+
+
+meta_data_map<-read.table('Wilderlab_meta_map2.txt',sep='\t',quote='',header =T)
 
 
 
+#outtab$location
+outtab_map<-left_join(outtab,meta_data_map,by=c('location'='HBRC_Site_Name'))
 
+#just averaging duplications
+outtab_map<-outtab_map %>% select(location,Difference_observed,Difference_simpson,Difference_shannon,Longitude_hbrc,Latitude_hbrc) %>% group_by(location) %>% summarise_all(mean)
 
+Sys.setenv('MAPBOX_TOKEN' ='pk.eyJ1IjoiZWRkeWRvd2xlIiwiYSI6ImNsbHZtdTFnZTFhMnMzZXBnMXp2Y2JpcDQifQ.wdMRqVD7Td479vIYG6Q9nw')
+library(plotly)
+library(maps)
+#?add_markers
+##like leaflet these figures are layered on top
+map<-plot_mapbox(outtab_map) %>%
+  add_markers(
+    x = ~Longitude_hbrc, 
+    y = ~Latitude_hbrc, 
+    size = 30, 
+    opacity=1,
+#    color = ~Difference_observed,
+    color = ~Difference_simpson,
+    alpha=1,
+#this line doesnt work except that it stops tha opacity which is helpful but also no idea why
+marker=list(size=20,line=list(color="black")),
+#colors = colorRampPalette(brewer.pal(11,"Spectral"), bias = 1.8) (11), #center middle colour on 0 good for CI (postcyclone recovery)
+#colors = colorRampPalette(brewer.pal(11,"Spectral"), bias = 0.65) (11), #center middle colour on 0 good for CI (pre vs post)
+#colors = colorRampPalette(brewer.pal(11,"Spectral"), bias = 0.7) (11), #center middle colour on 0 good for CI
+#hill
+#colors = colorRampPalette(brewer.pal(11,"Spectral"), bias = 1.55) (11), #center middle colour on 0 good for CI (postcyclone recovery)
+#colors = colorRampPalette(brewer.pal(11,"Spectral"), bias = 0.55) (11), #center middle colour on 0 good for CI (pre vs post)
+#colors = colorRampPalette(brewer.pal(11,"Spectral"), bias = 0.75) (11), #center middle colour on 0 good for CI (pre vs 2024)
+#hill simpson
+#colors = colorRampPalette(brewer.pal(11,"Spectral"), bias = 2.5) (11), #center middle colour on 0 good for CI (postcyclone recovery)
+colors = colorRampPalette(brewer.pal(11,"Spectral"), bias = 0.35) (11), #center middle colour on 0 good for CI (pre vs post)
+#colors = colorRampPalette(brewer.pal(11,"Spectral"), bias = 0.8) (11), #center middle colour on 0 good for CI (pre vs 2024)
+#text = ~paste(location,'- Difference:',Difference_observed),
+text = ~paste(location,'- Difference:',Difference_simpson),
+hoverinfo = "text"
+  )
+map 
 
+##add in a legend
+#map<-map %>% layout(title = 'Diversity changes 2023 vs 2024 - assay RV',
+#map<-map %>% layout(title = 'Diversity changes pre (2022) vs 2024 - assay RV',
+#map<-map %>% layout(title = 'Diversity changes pre (2022) vs post (2023) - assay RV',
 
+#map<-map %>% layout(title = 'Diversity changes 2023 vs 2024 - assay CI hill observed',
+#map<-map %>% layout(title = 'Diversity changes pre (2022) vs post (2023) - assay CI hill observed',
+#map<-map %>% layout(title = 'Diversity changes pre (2022) vs 2024 - assay CI hill observed',
 
+20212022_20232024_persite_assay_WV
+#map<-map %>% layout(title = 'Diversity changes 2023 vs 2024 - assay WV hill Simpson',
+#map<-map %>% layout(title = 'Diversity changes pre (2022) vs post (2023) - assay WV hill Simpson',
+map<-map %>% layout(title = 'Diversity changes pre (2022) vs 2024 - assay WV hill Simpson',
+                                        mapbox = list(style = 'light')) 
+#outdoors
+map<-map %>% colorbar(title = "Difference Observed Diversity")
+map
+map$x
+#
+data$data[[1]]$text
+library(RColorBrewer)
+pal <- colorNumeric(palette = c("red", "blue","green"), domain = outtab_map$Difference_observed)
+pal<- colorNumeric(palette =  rev(brewer.pal(5,"YlOrRd")), domain = outtab_map$Difference_observed)
+leaflet(outtab_map) %>% 
+  addProviderTiles(
+    providers$Esri.WorldGrayCanvas,
+    options = providerTileOptions(opacity = 0.90)
+  ) %>%
+  addCircleMarkers(~Longitude_hbrc, ~Latitude_hbrc,
+                   popup = ~paste(location),
+                   color = ~pal(outtab_map$Difference_observed),
+                   radius=7,
+                   # color = colour,
+                   stroke = FALSE, fillOpacity = 1) %>% 
+  addLegend("bottomright", pal = pal, values = outtab_map$Difference_observed,
+            title = "Change in Observed Diversity",
+            opacity = 1)
+
+map<-plot_mapbox(meta_data_map) %>%
+  add_markers(
+    x = ~Longitude_hbrc, 
+    y = ~Latitude_hbrc, 
+    size = 30, 
+    opacity=1,
+    color = ~n_uniq_samplingdates,
+    alpha=1,
+    #this line doesnt work except that it stops tha opacity which is helpful but also no idea why
+    marker=list(size=20,line=list(color="black")),
+    #colors = brewer.pal(8,"OrRd"),
+    colors = c("#FDD49E","#FDBB84","#FC8D59","#EF6548","#D7301F","#990000"),
+    text = ~paste(HBRC_Site_Name),
+    hoverinfo = "text"
+  )
+map 
+
+map<-map %>% layout(title = 'Sampling 2019-2024',
+                    mapbox = list(style = 'light')) 
+#outdoors
+map<-map %>% colorbar(title = "#Unique samples")
+map
 
 ###################################
 #eddy's working to get to the loop#

@@ -30,6 +30,7 @@ library('gridExtra')
 library('ranacapa')
 library('stargazer')
 library('BiocManager')
+library('shinyfullscreen')
 options(repos = BiocManager::repositories())
 #think use stargazer to render the beta diversity table
 #https://groups.google.com/g/shiny-discuss/c/3VYuD6gjdk4?pli=1
@@ -235,26 +236,26 @@ function(input, output, session) {
     otu <- otu_table(otu_table_wide_clean_phyloseq(), taxa_are_rows = TRUE) 
     taxa <- tax_table(taxa_table_clean_phyloseq())
     sample <- sample_data(meta_data_clean())
-    print(head(otu))
-    print(head(taxa))
-    print(head(sample))
+  #  print(head(otu))
+  #  print(head(taxa))
+  #  print(head(sample))
     test<-meta_data_clean()[order(as.Date(meta_data_clean()$CollectionDate, format="%d/%m/%Y")),]
     test_names<-row.names(test)
     FisheDNA<-phyloseq(otu, taxa, sample)
-    print('made_phyloseq_object')
-    print(test_names)
+  #  print('made_phyloseq_object')
+  #  print(test_names)
     # print(sample_data(FisheDNA))
     #FisheDNA<-ps_reorder(FisheDNA, test_names)
-    print(sample_data(FisheDNA))
+  #  print(sample_data(FisheDNA))
    # FisheDNA.5<-ps_reorder(FisheDNA, test_names)
     FisheDNA.5<-FisheDNA
-    print('reordered')
+  #  print('reordered')
     #remove singletons (moving this down to after other filters)
     #    FisheDNA.5 <- filter_taxa(FisheDNA, function(x){sum(x > 0) > 1}, prune=TRUE)          
   #  to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice) %>% pull(sample_id)
     # print(to_prune)
  #   FisheDNA.5<-prune_samples(to_prune,FisheDNA.5)
-     print(FisheDNA.5)
+   #  print(FisheDNA.5)
     #filter those with less than 5 replicates
     #this is important when the taxa filters come on as it causes some samples to drop out if there is no target taxa ~ which means some samples will drop between taxa filters but this seems the best way around it. 
     filter<-as.data.frame(sample_data(FisheDNA.5)) %>% group_by(CollectionDate) %>% summarise(count=n()) %>% filter(count >=5) 
@@ -269,7 +270,7 @@ function(input, output, session) {
     #FisheDNA.test<-subset_samples(FisheDNA.5, CollectionDate %in% filter$CollectionDate)
     #print(sample_names(FisheDNA.5))
     FisheDNA.5 <- prune_samples(sample_sums(FisheDNA.5) >= 1, FisheDNA.5)
-    #   print(otu_table(FisheDNA.5))
+    print(otu_table(FisheDNA.5))
     print('end_phyloseq')
     return(FisheDNA.5)
   })
@@ -280,17 +281,19 @@ function(input, output, session) {
   #generate a innext object
   #if we skip when there is <5 samples passing filter...then would need to fix the colours later on
   inext_object<-reactive({
+    print('startinnext')
     if (nrow(otu_table(phyloseq_object())) < 10) {
       print('lessthan10taxa')
       return(NULL)
     }
     else {
+      print('morethan10taxa')
       phyloseq.pa <- microbiome::transform(phyloseq_object(), 'pa')
       # print(otu_table(phyloseq_object()))
       print(nrow(otu_table(phyloseq_object())))
       categories <- unique(sample_data(phyloseq.pa)$CollectionDate)
       split_physeq_list <- list()
-      # print(categories)
+       print(categories)
       #subselected_categories<-NULL
       for (category in categories) {
         #  print(category)
@@ -335,21 +338,31 @@ function(input, output, session) {
   
   #plot across all 
   pt1<-reactive({
+    print('here')
     if (input$analysis == "Site statistics" ) {
+      print('startrarefraction')
       p<-ggrare(phyloseq_object(), color = "CollectionDate", label = "Sample",step = 100, se = FALSE) + theme_bw()
       p$data$CollectionDate <- factor(p$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(p$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
       p<-p+ theme(axis.text.x = element_text(size = 7, angle = 90, vjust = 0.5, hjust=1)) + theme(legend.title = element_text(size = 8),legend.text = element_text(size = 7)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Rarefraction Curve")+ labs(colour = "Sampling Date")#guides(fill=guide_legend(title='Sampling Date'))
-      
+      print('end_rarefraction')
+      return(p)
     }
     if (input$analysis == "Site analysis" ) {
       phyloseq_object_prune.pa <- microbiome::transform(phyloseq_object(), 'pa') #pa dataset
+#catch for when MDS plot bungs out
+      tryCatch({
       FisheDNA.ord <- ordinate(phyloseq_object_prune.pa, "NMDS", "jaccard") 
       p<-plot_ordination(phyloseq_object(), FisheDNA.ord, type="samples", color="CollectionDate") + theme_bw()+ stat_ellipse(type = "norm", linetype = 2) +ggtitle("NMDS")+ labs(colour = "Sampling Date")+
         theme(axis.text.x = element_text(size = 8, angle = 90, vjust = 0.5, hjust=1),axis.text.y = element_text(size = 8),axis.title=element_text(size=11)) 
       p$data$CollectionDate <- factor(p$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(p$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
-    }
-    return(p)
-  })
+      return(p)
+      }, error = function(e) {
+        print('mds error')
+        return(NULL)
+   #   return(p)
+    },silent=TRUE)
+ }
+    })
   pt2 <- reactive({
     if (input$analysis == "Site statistics") 
     {
@@ -386,6 +399,16 @@ function(input, output, session) {
       rich<-estimate_richness(phyloseq_object_prune.pa, measures=c(input$diversity_measure))
       Fish_Sample = as(sample_data(phyloseq_object_prune.pa), "matrix")
       rich<-cbind(rich, Fish_Sample)
+      if (input$diversity_measure == 'Simpson' & input$set_scale == 'Fixed'){
+        pbar<-ggplot(rich, aes(x=CollectionDate, y=!! sym(input$diversity_measure), colour = CollectionDate)) +
+          geom_boxplot() + ggtitle("Species Richness") +
+          ylab(paste(input$diversity_measure,"richness estimate"))+
+          theme_bw() +
+          theme(axis.text.x = element_text(size = 8,angle = 90, hjust=1))+ labs(colour = "Sampling Date",x="Sampling Date")+theme(        axis.text.y = element_text(size = 8),axis.title=element_text(size=11)) +scale_y_continuous(limits = c(0, 1))
+        #+theme(axis.text=element_text(size=4),axis.title=element_text(size=12))
+        pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )       
+      }
+      else{
       pbar<-ggplot(rich, aes(x=CollectionDate, y=!! sym(input$diversity_measure), colour = CollectionDate)) +
         geom_boxplot() + ggtitle("Species Richness") +
         ylab(paste(input$diversity_measure,"richness estimate"))+
@@ -393,15 +416,24 @@ function(input, output, session) {
         theme(axis.text.x = element_text(size = 8,angle = 90, hjust=1))+ labs(colour = "Sampling Date",x="Sampling Date")+theme(        axis.text.y = element_text(size = 8),axis.title=element_text(size=11))
       #+theme(axis.text=element_text(size=4),axis.title=element_text(size=12))
       pbar$data$CollectionDate <- factor(pbar$data$CollectionDate, levels = str_remove(format(sort(as.Date(unique(pbar$data$CollectionDate), format="%d/%m/%Y")),"%d/%m/%y"),"^0+") )
+      }
     }
+    print('return pbar')
     return(pbar)
   })
   pt3 <- reactive({
     if (input$analysis == "Site statistics") {    
-      to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice)  %>% .[order(as.Date(.$CollectionDate, format="%d/%m/%Y")),] %>% pull(sample_id)
-      phyloseq_object_prune<-ps_reorder(phyloseq_object(), to_prune)
+     # to_prune<-meta_data_clean() %>% tibble::rownames_to_column(., "sample_id") %>% filter(HBRC_Site_Name==input$site_choice)  %>% .[order(as.Date(.$CollectionDate, format="%d/%m/%Y")),] %>% pull(sample_id)
+    #  print(to_prune)
+    #  print(sample_names(FisheDNA.5))
+      phyloseq_object_prune<-phyloseq_object()
+  #    phyloseq_object_prune<-ps_reorder(phyloseq_object(), to_prune)
       ptest = plot_bar(phyloseq_object_prune, "CollectionDate", fill=input$level) + geom_bar(aes(color=Class, fill=Class), stat="identity", position="stack") + ggtitle("Read Abundance") + theme_bw()+  theme(legend.position="none")
       test_data<-ptest$data
+      if (is.null(test_data$Genus)) {
+        #data_fish$Genus =='NA'
+        test_data[ , 'Genus'] <- NA
+      }
       #labeling only the top ten classes or genera
       top_10class<-test_data %>% group_by(!! sym(input$level)) %>% drop_na(!! sym(input$level)) %>%  summarise(Abundance = sum(Abundance,na.rm=TRUE)) %>% arrange(desc(Abundance)) %>% slice_max(Abundance, n = 10,with_ties=FALSE) %>% mutate(top10group= !! sym(input$level))
       #    print(top_10class)
@@ -464,8 +496,15 @@ function(input, output, session) {
       FisheDNA.6 = transform_sample_counts(phyloseq_object(), function(x) x / sum(x) )
       data_fish <- psmelt(FisheDNA.6)
       #find top 10 classes in dataset
+      print('find 10 ten')
+      if (is.null(data_fish$Genus)) {
+        #data_fish$Genus =='NA'
+        data_fish[ , 'Genus'] <- NA
+      }
+      #put a try in here for when there is only NA's
       top_10class<-data_fish %>% group_by(!! sym(input$level)) %>% drop_na(!! sym(input$level)) %>%  summarise(Abundance = sum(Abundance,na.rm=TRUE)) %>% arrange(desc(Abundance)) %>% slice_max(Abundance, n = 10,with_ties=FALSE) %>% mutate(top10group= !! sym(input$level))
-      #    print(top_10class)
+      print(top_10class)
+      
       #maybe change the column name then dont have the issue of selecting a column using input
       data_fish_top10 <- data_fish %>% 
         mutate(top10 = ifelse (! (!! sym(input$level)) %in% top_10class$top10group, "Other", !! sym(input$level)))
@@ -479,7 +518,7 @@ function(input, output, session) {
       col_brew<-c(brewer.pal(n = 10, name = "Paired"),"#808080")
       #relevel other to end
       data_fish_top10$top10 <- forcats::fct_relevel(data_fish_top10$top10, "Other", after = Inf)
-      pbar <- ggplot(data=data_fish_top10, aes(x=Sample, y=Abundance, fill=top10)) + facet_grid(~CollectionDate, scales = "free")
+      pbar <- ggplot(data=data_fish_top10, aes(x=Sample, y=Abundance, fill=top10)) + facet_grid(~CollectionDate, scales='free',space='free')
       pbar<-pbar + geom_bar(aes(), stat="identity", position="fill") +theme_bw()+ theme(axis.text.x = element_text(size = 7, angle = 90, vjust = 0.5, hjust=1)) + scale_fill_manual(values=col_brew)+ guides(fill=guide_legend(title=paste("Top 10",input$level)))+ theme(legend.title = element_text(size = 8),legend.text = element_text(size = 7)) +theme(legend.key.height=unit(0.3, "cm"))+ ggtitle("Relative Read Abundance")+ theme(strip.text.x = element_text(size = 7,angle = 0))
       
       #  pbar <- ggplot(data=data_fish, aes(x=Sample, y=Abundance, fill=Class)) + facet_grid(~CollectionDate, scales = "free") + geom_bar(aes(), stat="identity", position="fill") + ggtitle("Relative abundance P/A") + theme(legend.key.size = unit(0.03, 'cm')) +theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1),axis.title=element_text(size=10,face="bold"),axis.text=element_text(size=6))
@@ -519,12 +558,13 @@ function(input, output, session) {
   #cause its now conditional on the table I need to have seperate plot labels for the UI side
   output$plot1 = renderPlot({
     ptlist <- list(pt4(),pt1(),pt2(),pt3())
+    print(ptlist)
     # remove the null plots from ptlist and wtlist
     to_delete <- !sapply(ptlist,is.null)
     ptlist <- ptlist[to_delete] 
     if (length(ptlist)==0) return(NULL)
  #       grid.arrange(grobs=ptlist,ncol=length(ptlist))
-    grid.arrange(grobs=ptlist,ncol=2)
+    grid.arrange(grobs=ptlist,ncol=1)
     
   })
   output$plot2 = renderPlot({
@@ -532,9 +572,36 @@ function(input, output, session) {
     # remove the null plots from ptlist and wtlist
     to_delete <- !sapply(ptlist,is.null)
     ptlist <- ptlist[to_delete] 
+ #   print(ptlist)
     if (length(ptlist)==0) return(NULL)
     #   grid.arrange(grobs=ptlist,ncol=length(ptlist))
-    grid.arrange(grobs=ptlist,ncol=2)
+    grid.arrange(grobs=ptlist,ncol=1)
     
   })
+  #plot download
+#  fordownload<- observeEvent({
+  fordownload<- reactive({
+    if (input$analysis == "Site statistics") { 
+      ptlist <- list(pt3(),pt1(),pt2(),pt4())}
+    if (input$analysis == "Site analysis") { 
+      ptlist <- list(pt4(),pt1(),pt2(),pt3())}
+    to_delete <- !sapply(ptlist,is.null)
+ #   print(to_delete)
+    ptlist <- ptlist[to_delete] 
+ #   print(ptlist)
+    if (length(ptlist)==0) return(NULL)
+    else return(ptlist)
+    })
+  output$downloadPlot <- downloadHandler(
+    filename = function() { paste("Plot", '.svg', sep='') },
+    content = function(file) {
+      ggsave(file, plot = grid.arrange(grobs=fordownload(),ncol=2), device = "svg",height=20,width=20)
+    }
+  )
+  output$downloadtaxonomy <- downloadHandler(
+    filename = function() { 'TaxonomyTable.csv'},
+    content = function(fname) {
+      write.csv(tax_table(phyloseq_object()), fname)
+    }
+  )
 }

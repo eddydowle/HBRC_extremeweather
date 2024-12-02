@@ -6,7 +6,7 @@
 #
 #    https://shiny.posit.co/
 #
-
+library('shinyfullscreen')
 library('shiny')
 #library('DT')
 #library('data.table')
@@ -54,7 +54,10 @@ test<-read.table('HBRC_records_Eddy_freshwater_season.txt',header=T,row.names=NU
 #write.table(test2,'HBRC_records_Eddy_freshwater_season.txt',sep='\t',quote=F,row.names = F)
 
 function(input, output, session) {
-  
+
+#updateSelectizeInput(session, 'Select Taxa', choices = sort((test %>% select(input$level)  %>% unique()) [,1]), server = TRUE)
+
+    
  output$secondSelection<-renderUI({
    if (input$filter_group=='All'){
      test_filtered<-test
@@ -65,8 +68,9 @@ function(input, output, session) {
    if (input$filter_group=='Freshwater fish'){
      test_filtered<-test %>% filter(Class %in% c('Actinopteri','Hyperoartia'))
    }
-   selectInput("taxa", "Select taxa", choices =sort((test_filtered %>% select(input$level)  %>% unique()) [,1]))
-   })
+#   selectInput("taxa", "Select taxa", choices =sort((test_filtered %>% select(input$level)  %>% unique()) [,1]))
+  pickerInput("taxa", "Select taxa", choices =sort((test_filtered %>% select(input$level)  %>% unique()) [,1]),multiple=F)
+    })
 
   #probably should be more like summer 2021, summer 2022 or something
   test_filtered<- reactive({
@@ -110,8 +114,8 @@ function(input, output, session) {
     #this results in some NA's as there is some sites (2 that are only sampled post)
     df<-df %>% filter(!HBRC_Site_Name=='Wharerangi - Dan and Lindsay Bates') %>% filter(!HBRC_Site_Name=='Mangaone Rv at Dartmoor Br')
     }
-    
-    if (input$integer == "2021-2022 Pre-cyclone vs 2022-2023 Post-cyclone") {
+   # 2021-2022 Pre-cyclone vs 2023 (March-June) Post-cyclone
+    if (input$integer == "2021-2022 Pre-cyclone vs 2023 (March-June) Post-cyclone") {
       filtered_2022<-test_filtered_select %>% filter(season=='2021-2022' ) %>% select(HBRC_Site_Name) %>% distinct()
       filtered_2023<-test_filtered_select %>% filter(season=='2022-2023' ) %>% select(HBRC_Site_Name) %>% distinct()
       all_sites_2022<-test %>% filter(season=='2021-2022') %>% select(HBRC_Site_Name) %>% distinct()
@@ -129,7 +133,8 @@ function(input, output, session) {
       df<-df %>% filter(!HBRC_Site_Name=='Wharerangi - Dan and Lindsay Bates') %>% filter(!HBRC_Site_Name=='Mangaone Rv at Dartmoor Br')%>% filter(!present=='NA')
     }
     #choices =c("2020-2021","2021-2022","2022-2023","2023-2024","Pre-cyclone (2019 to March 2023) vs Post-cyclone (March 2023 to 2024)","2021-2022 Pre-cyclone vs 2022-2023 Post-cyclone","2022-2023 (Post-cyclone only) vs 2023-2024"), selected='2023-2024'),
-    if (input$integer == "2022-2023 (Post-cyclone only) vs 2023-2024") {
+    #2023 (March-June) vs 2023-2024 (July 2023-April 2024)
+    if (input$integer == "2023 (March-June) vs 2023-2024 (July 2023-April 2024)") {
       filtered_2024<-test_filtered_select %>% filter(season=='2022-2023' ) %>% select(HBRC_Site_Name) %>% distinct()
       filtered_2023<-test_filtered_select %>% filter(season=='2023-2024') %>% select(HBRC_Site_Name) %>% distinct()
       all_sites_2024<-test %>% filter(season=='2023-2024') %>% select(HBRC_Site_Name) %>% distinct()
@@ -167,16 +172,56 @@ function(input, output, session) {
   )
 })
 
-  output$mymap <- renderLeaflet({ leaflet(test_filtered()) %>% 
-    addTiles() %>%
+  output$mymap <- renderLeaflet({ 
+    validate(
+      need(input$taxa != "", "No taxa selected") # display custom message in need
+    )
+    if (input$map_background == "Satellite") {
+      mp<-leaflet(test_filtered()) %>% 
+      addProviderTiles(
+        providers$Esri.WorldImagery,
+        options = providerTileOptions(opacity = 0.90)
+      ) %>%
     addCircleMarkers(~Longitude_hbrc, ~Latitude_hbrc,
             popup = ~paste(HBRC_Site_Name),
             color = ~test_filtered_col()(present),
+            radius=7,
  #           color = colour,
             stroke = FALSE, fillOpacity = 1) %>% 
     addLegend("bottomright", pal = test_filtered_col(), values = ~present,
               title = "Presence/absence",
-              opacity = 1) 
+              opacity = 1)
+    }
+    if (input$map_background == "Stylised") {
+      mp<-leaflet(test_filtered()) %>% 
+        addTiles() %>%
+        addCircleMarkers(~Longitude_hbrc, ~Latitude_hbrc,
+                         popup = ~paste(HBRC_Site_Name),
+                         color = ~test_filtered_col()(present),
+                         radius=7,
+                         #           color = colour,
+                         stroke = FALSE, fillOpacity = 1) %>% 
+        addLegend("bottomright", pal = test_filtered_col(), values = ~present,
+                  title = "Presence/absence",
+                  opacity = 1)
+    }
+    if (input$map_background == "Grey-scale") {
+      mp<-leaflet(test_filtered()) %>% 
+        addProviderTiles(
+          providers$Esri.WorldGrayCanvas,
+          options = providerTileOptions(opacity = 0.90)
+        ) %>%
+        addCircleMarkers(~Longitude_hbrc, ~Latitude_hbrc,
+                         popup = ~paste(HBRC_Site_Name),
+                         color = ~test_filtered_col()(present),
+                         radius=7,
+                         #           color = colour,
+                         stroke = FALSE, fillOpacity = 1) %>% 
+        addLegend("bottomright", pal = test_filtered_col(), values = ~present,
+                  title = "Presence/absence",
+                  opacity = 1)
+    }
+    return(mp)
   })
   
   output$table <- DT::renderDataTable({

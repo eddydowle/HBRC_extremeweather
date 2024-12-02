@@ -19,7 +19,7 @@ library('RColorBrewer')
 library('tidyverse')
 #library('readxl')
 library('devtools')
-#library('tidyverse')
+library('svglite')
 #library('viridis')
 #library('indicspecies') 
 library('vegan')
@@ -32,6 +32,7 @@ library('microbiome')
 library('gridExtra')
 library('ranacapa')
 library('stargazer')
+library('shinyfullscreen')
 
 meta_data<-read.table('Wilderlab_meta_out_clean.txt',sep='\t',quote='',header =T)
 
@@ -63,6 +64,9 @@ fluidPage(theme = shinytheme("united"),
                 "input.analysis=='Site analysis'",
                 pickerInput("diversity_measure", "Alpha diversity type", c("Observed", "Chao1",  "Shannon", "Simpson", "InvSimpson"),multiple = F)),
               conditionalPanel(
+                  "input.diversity_measure=='Simpson'",
+                  pickerInput("set_scale", "Fix axis (0-1)", c("Not-fixed","Fixed"),multiple = F)),
+              conditionalPanel(
                 "input.assay=='BE: General Eukayote'|input.assay=='BU: General Eukaryote'|input.assay=='MZ: Vascular Plants'|input.assay=='TP: Vascular Plants'|input.assay=='UM: Microbe'",
                 pickerInput('subset_data_rest', "Select otu's",'All',multiple=F
                 )),
@@ -83,14 +87,22 @@ fluidPage(theme = shinytheme("united"),
             mainPanel(
               conditionalPanel(
                 "input.analysis=='Site analysis'",
-                column(6,plotOutput(outputId="plot1", width="1000px",height="600px"),uiOutput("lm1"))
-                #    column(6,plotOutput(outputId="plot1"),uiOutput("lm1"))
+                #column(6,plotOutput(outputId="plot1", width="1000px",height="600px"),uiOutput("lm1"))
+               #     column(6,plotOutput(outputId="plot1"),uiOutput("lm1"))
+                plotOutput(outputId="plot1",height="1500px"),uiOutput("lm1"),
+                fullscreen_those(items = list("plot1",'lm1'))
               ),
               conditionalPanel(
                 "input.analysis=='Site statistics'",
-                column(6,plotOutput(outputId="plot2", width="1000px",height="600px"))
+               # column(6,plotOutput(outputId="plot2", width="1000px",height="600px"))
                 #  column(6,plotOutput(outputId="plot2"))
-              )
-            )))
+                plotOutput(outputId="plot2",height="1500px"),
+                fullscreen_those(items = list("plot2"))
+              ),
+              downloadButton("downloadPlot",'Plot download'),
+              downloadButton("downloadtaxonomy",'Taxa table download')
+            )
+
+))
 
 #that means I can probably modify how I display the plots ~ but maybe not as innext will have a dependency in it to skip if its not enough samples
